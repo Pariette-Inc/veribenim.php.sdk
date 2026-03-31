@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Packagist & WordPress.org Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, curl
+
+      - name: Install core dependencies
+        working-directory: packages/core
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Install Laravel dependencies
+        working-directory: packages/laravel
+        run: composer install --no-dev --optimize-autoloader
+
+      # Packagist otomatik webhook ile güncellenir (repo push yeterli).
+      # Manuel tetiklemek için aşağıdaki adım aktifleştirilebilir.
+      # - name: Packagist webhook
+      #   run: |
+      #     curl -X POST \
+      #       "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}" \
+      #       -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
+
+      - name: WordPress.org deploy (plugin)
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        with:
+          generate-zip: true
+        env:
+          SVN_USERNAME: ${{ secrets.WP_SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.WP_SVN_PASSWORD }}
+          SLUG: veribenim
+          BUILD_DIR: packages/wordpress
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/wordpress/veribenim.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
