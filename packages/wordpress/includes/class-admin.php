@@ -34,7 +34,7 @@ class Veribenim_Admin
         register_setting('veribenim_settings', 'veribenim_api_url', [
             'type'              => 'string',
             'sanitize_callback' => 'esc_url_raw',
-            'default'           => 'https://api.veribenim.com',
+            'default'           => 'https://live.veribenim.com',
         ]);
 
         register_setting('veribenim_settings', 'veribenim_script_url', [

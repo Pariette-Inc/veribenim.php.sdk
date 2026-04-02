@@ -16,7 +16,7 @@ class VeribenimConfig
         /** Debug modu. Varsayılan: false */
         public readonly bool $debug = false,
         /** @internal — Yalnızca ileri düzey kullanım */
-        public readonly string $apiUrl = 'https://api.veribenim.com',
+        public readonly string $apiUrl = 'https://live.veribenim.com',
         /** @internal — Yalnızca ileri düzey kullanım */
         public readonly string $scriptUrl = 'https://bundles.veribenim.com/bundle.js',
     ) {
