@@ -79,6 +79,26 @@ $client->savePreferences([
 | [`veribenim/laravel`](https://packagist.org/packages/veribenim/laravel) | Laravel ServiceProvider, Facade, Blade direktifleri |
 | [`veribenim/wordpress`](https://packagist.org/packages/veribenim/wordpress) | WordPress plugin |
 
+## Veribenim Platform Özellikleri
+
+SDK, Veribenim'in uçtan uca KVKK/GDPR yönetim platformuyla entegre çalışır:
+
+- **Veri Envanteri**: Departman/süreç bazlı veri haritalama, 20 KVKK veri kategorisi, VERBİS uyumlu export
+- **Saklama-İmha Otomasyonu**: Saklama politikaları, otomatik imha, imha tutanakları, 5 imha yöntemi
+- **Risk Yönetimi**: 5x5 risk matrisi, 7 risk kategorisi, aksiyon takibi, risk raporu export
+- **İç Denetim & Aksiyon Takibi**: 6 denetim tipi, 0-100 puanlama, aksiyon atama ve gecikme takibi
+- **Doküman Şablonları**: 10 hazır KVKK/GDPR şablonu, değişken sistemi, çoklu dil, versiyon takibi
+- **Rıza Versiyonlama**: Onay metni versiyon takibi, yeniden onay mekanizması, versiyon karşılaştırma
+- **Veri Hakkı Talepleri (DSAR)**: 7 talep tipi, 30 gün deadline — `submitDsar()` ile SDK'dan gönderin
+- **Veri İhlali Yönetimi**: 72 saat countdown, risk seviyeleri, otorite bildirim kaydı
+- **VERBİS / RoPA Export**: KVKK VERBİS ve GDPR Md.30 formatında CSV/JSON rapor
+- **Politika Yönetimi**: Gizlilik, çerez politikası, KVKK aydınlatma — çoklu dil, PDF/HTML export
+- **Uyumluluk Skoru**: 17 kural, A-F notlandırma, kategori bazlı düzeltme önerileri
+- **Form Rızası Takibi**: `logFormConsent()` ile tüm form onaylarını kaydedin
+- **Webhook Sistemi**: consent, DSAR, breach olaylarını Slack/Teams/CRM'e iletin
+- **Çerez Tarayıcı**: 50+ tracker otomatik tespiti
+- **Tercih Merkezi**: Kalıcı URL ile ziyaretçi rıza yönetimi + DSAR entegrasyonu
+
 ## Lisans
 
 MIT © [Pariette](https://veribenim.com)
