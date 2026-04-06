@@ -90,13 +90,19 @@ Veribenim sadece bir çerez SDK'sı değil, **tam kapsamlı bir KVKK/GDPR uyum y
 | **Veri İhlali Yönetimi** | GDPR Md.33: 72 saat countdown, risk seviyesi, durum akışı, otorite bildirim kaydı |
 | **VERBİS / RoPA Export** | KVKK VERBİS kaydı ve GDPR Md.30 RoPA: CSV/JSON export, 17 alan, otomatik haritalama |
 | **Politika Yönetimi** | Gizlilik politikası, çerez politikası, KVKK aydınlatma, veri işleme sözleşmesi — çoklu dil, PDF/HTML export |
-| **Uyumluluk Skoru** | 17 kural, 5 kategori, A-F notlandırma, adım adım düzeltme önerileri |
+| **Uyumluluk Skoru** | 22 kural, 5 kategori, A-F notlandırma, adım adım düzeltme önerileri |
 | **Form Rızası Takibi** | İletişim, üyelik, bülten formlarındaki KVKK onayını API ile kayıt altına alma |
 | **Webhook Sistemi** | 7 olay tipi, HMAC-SHA256 imzalama, Slack/Teams/n8n entegrasyonu |
 | **Çerez Tarayıcı** | 50+ bilinen tracker otomatik tespiti (GA, Meta Pixel, Hotjar vb.) |
 | **Site Sağlık Kontrolü** | 7 faktörlü KVKK uyumluluk taraması |
 | **Tercih Merkezi** | Ziyaretçilerin çerez tercihlerini her zaman değiştirebildiği kalıcı panel + DSAR entegrasyonu |
 | **AI Asistan** | RAG tabanlı KVKK/GDPR bilgi asistanı |
+| **Meşru Menfaat Değerlendirmesi (LIA)** | KVK Kurul rehberi uyumlu 3-adım balans testi: Amaç → Zorunluluk → Dengeleme |
+| **VERBİS Kaydı** | KVKK Md.16: Veri işleme aktivitesi kayıt asistanı, exemption check, otomatik export |
+| **Rıza Yenileme** | KVK Kurul Çerez Rehberi 2022: 12 aylık yenileme, `consent_renewal_required` API flag |
+| **Rızayı Geri Çekme** | KVKK Md.11/1-e: `withdraw` aksiyonu, ispat yükümlülüğü için audit trail korunur |
+| **Veri Saklama & İmha** | KVKK Md.7: Ortam bazlı saklama süreleri, otomatik periyodik imha |
+| **Çerez Duvarı Koruması** | KVK Kurul kararı: Cookie wall yasağı, compliance score kontrolü (ağırlık 12) |
 
 ---
 
@@ -242,6 +248,7 @@ $client->getPreferences(...);      // Tercih al
 $client->savePreferences(...);     // Tercih kaydet
 $client->logImpression();          // Sayfa ziyareti
 $client->logConsent(...);          // Manuel rıza
+$client->withdrawConsent(...);     // Rızayı geri çek (KVKK Md.11/1-e)
 $client->submitDsar(...);          // DSAR isteği
 ```
 
@@ -406,6 +413,39 @@ public function handleDataRequest() {
     'status' => 'submitted',
     'estimated_completion' => '2026-04-30'
 ]
+```
+
+### withdrawConsent — Rızayı Geri Çekme (KVKK Md.11/1-e)
+
+KVKK, rızayı geri çekmenin rıza vermek kadar kolay olmasını zorunlu kılar. Consent kaydı temizlenir, audit trail korunur:
+
+```php
+// Kullanıcı "Tüm izinleri geri çek" butonuna tıkladığında
+$sessionId = $_COOKIE['veribenim_session'] ?? null;
+
+try {
+    $client->withdrawConsent($sessionId);
+    // Başarılı — tüm consent verisi temizlendi, log kaydı tutuldu
+    http_response_code(200);
+    echo json_encode(['withdrawn' => true]);
+} catch (Exception $e) {
+    error_log('Withdraw error: ' . $e->getMessage());
+}
+```
+
+### Rıza Yenileme Kontrolü
+
+KVK Kurul Çerez Rehberi 2022 gereği rıza 12 ayda bir yenilenmelidir. API, süresi dolmak üzere olan rızalar için `consent_renewal_required: true` döndürür:
+
+```php
+// Sayfa yüklenirken kontrol et
+$preferences = $client->getPreferences($sessionId);
+
+if ($preferences['consent_renewal_required'] ?? false) {
+    // Banner'ı yeniden göster
+    // veya JavaScript'e flag ilet
+    $response['show_renewal_banner'] = true;
+}
 ```
 
 ### Çerez Banner Entegrasyonu
