@@ -119,6 +119,7 @@ use Veribenim\VeribenimClient;
 // SDK'yı başlat
 $client = new VeribenimClient(
     token: 'your_api_token',
+    domain: 'example.com', // Bundle script URL için (example.com → examplecom.js)
     lang: 'tr',
     debug: false
 );
@@ -168,6 +169,7 @@ use Veribenim\VeribenimClient;
 
 $client = new VeribenimClient(
     token: 'your_site_token_here',  // https://veribenim.com/dashboard
+    domain: 'example.com',          // Bundle script URL (example.com → examplecom.js)
     lang: 'tr',                      // Dil seçimi
     debug: false                     // Production'da false
 );
@@ -179,6 +181,7 @@ $client = new VeribenimClient(
 // .env dosyanız varsa:
 $client = new VeribenimClient(
     token: $_ENV['VERIBENIM_TOKEN'],
+    domain: $_ENV['VERIBENIM_DOMAIN'] ?? '',
     lang: $_ENV['VERIBENIM_LANG'] ?? 'tr',
     debug: $_ENV['APP_DEBUG'] ?? false
 );
@@ -195,6 +198,7 @@ public function register()
     $this->app->singleton(VeribenimClient::class, function () {
         return new VeribenimClient(
             token: config('veribenim.token'),
+            domain: config('veribenim.domain'),
             lang: config('veribenim.lang'),
             debug: config('app.debug')
         );
@@ -210,6 +214,7 @@ services:
     Veribenim\VeribenimClient:
         arguments:
             $token: '%env(VERIBENIM_TOKEN)%'
+            $domain: '%env(VERIBENIM_DOMAIN)%'
             $lang: 'tr'
             $debug: '%kernel.debug%'
 ```
