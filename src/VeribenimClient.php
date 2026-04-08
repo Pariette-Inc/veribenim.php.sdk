@@ -81,12 +81,16 @@ class VeribenimClient
 
     /**
      * Banner script tag'ini döner.
-     * Bundle URL'si Veribenim panelinden alınıp $scriptUrl olarak verilmelidir.
-     * Panelde: Siteniz → Entegrasyon → Bundle URL
+     * Config'teki domain veya scriptUrl'den bundle URL'ini oluşturur.
+     * Örn: domain='claude.com' → <script src="https://bundles.veribenim.com/claudecom.js" async></script>
      */
     public function scriptTag(): string
     {
-        $url = htmlspecialchars($this->config->scriptUrl, ENT_QUOTES);
+        $url = $this->config->getBundleUrl();
+        if (empty($url)) {
+            return '<!-- Veribenim: domain veya scriptUrl gerekli -->';
+        }
+        $url = htmlspecialchars($url, ENT_QUOTES);
         return '<script src="' . $url . '" async></script>';
     }
 
@@ -123,6 +127,182 @@ class VeribenimClient
         }
 
         return $this->post("/api/form-consents/{$this->config->token}", $data);
+    }
+
+    // -------------------------------------------------------------------------
+    // Form Generator — Form şeması ve gönderimi
+    // GET  /api/public/forms/{token}/{slug}
+    // POST /api/public/forms/{token}/{slug}
+    // -------------------------------------------------------------------------
+
+    /**
+     * Bir formun şemasını (alanlar, adımlar, ayarlar) getirir.
+     *
+     * @param string $slug  Form slug'ı (örn: 'iletisim-formu')
+     * @param string|null $lang  Dil kodu (tr, en, de, fr, es, bg, ar). null ise environment dili kullanılır.
+     * @return array|null   Form şeması veya null (bulunamazsa / pasif)
+     */
+    public function getFormSchema(string $slug, ?string $lang = null): ?array
+    {
+        $qs = $lang ? '?lang=' . rawurlencode($lang) : '';
+        return $this->get("/api/public/forms/{$this->config->token}/" . rawurlencode($slug) . $qs);
+    }
+
+    /**
+     * Form verisini Veribenim'e gönderir.
+     * Bildirim e-postaları ve webhook'lar otomatik tetiklenir.
+     *
+     * @param string $slug  Form slug'ı
+     * @param array  $data  {field_uuid: değer} şeklinde form verileri
+     * @return array|null   Başarı yanıtı veya null
+     */
+    public function submitForm(string $slug, array $data): ?array
+    {
+        return $this->post(
+            "/api/public/forms/{$this->config->token}/" . rawurlencode($slug),
+            $data
+        );
+    }
+
+    /**
+     * Formu sunucu tarafında HTML olarak render eder ve döndürür.
+     * Döndürülen HTML'i doğrudan sayfaya basabilirsiniz.
+     *
+     * Temel form markup'ını üretir; JavaScript ile daha zengin etkileşim
+     * için veribenim.js bundle veya JS SDK kullanılması önerilir.
+     *
+     * @param string $slug     Form slug'ı
+     * @param array  $options  ['class' => '...', 'id' => '...', 'action' => '...', 'lang' => 'en']
+     * @return string          HTML çıktısı
+     */
+    public function renderFormHtml(string $slug, array $options = []): string
+    {
+        $lang = $options['lang'] ?? null;
+        $schema = $this->getFormSchema($slug, $lang);
+
+        if (!$schema) {
+            return '<!-- Veribenim: form "' . htmlspecialchars($slug) . '" bulunamadı -->';
+        }
+
+        $apiUrl   = rtrim($this->config->apiUrl, '/') . "/api/public/forms/{$this->config->token}/" . rawurlencode($slug);
+        $formId   = $options['id'] ?? 'vb-form-' . htmlspecialchars($slug);
+        $formClass = $options['class'] ?? 'vb-form';
+        $fields   = $schema['fields'] ?? [];
+        $settings = $schema['settings'] ?? [];
+        $submitText = $settings['submit_button_text'] ?? 'Gönder';
+
+        $html  = '<form id="' . $formId . '" class="' . $formClass . '" data-vb-form="' . htmlspecialchars($slug) . '" data-vb-action="' . htmlspecialchars($apiUrl) . '" novalidate>';
+
+        // Alanları sırala
+        usort($fields, fn($a, $b) => ($a['order'] ?? 0) <=> ($b['order'] ?? 0));
+
+        foreach ($fields as $field) {
+            $html .= $this->renderField($field);
+        }
+
+        $html .= '<button type="submit" class="vb-submit">' . htmlspecialchars($submitText) . '</button>';
+        $html .= '<div class="vb-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> VeriBenim ile kişisel verileriniz koruma altında</div>';
+        $html .= '</form>';
+
+        return $html;
+    }
+
+    /**
+     * Tek bir form alanını HTML olarak render eder.
+     *
+     * @internal renderFormHtml tarafından kullanılır.
+     */
+    private function renderField(array $field): string
+    {
+        $type     = $field['type'] ?? 'input';
+        $uuid     = htmlspecialchars($field['uuid'] ?? '');
+        $label    = htmlspecialchars($field['label'] ?? '');
+        $placeholder = htmlspecialchars($field['placeholder'] ?? '');
+        $required = !empty($field['required']);
+        $helpText = htmlspecialchars($field['help_text'] ?? '');
+        $reqAttr  = $required ? ' required' : '';
+        $reqMark  = $required ? '<span class="vb-required" aria-hidden="true"> *</span>' : '';
+
+        if ($type === 'divider') {
+            return '<hr class="vb-divider">';
+        }
+
+        if ($type === 'heading') {
+            return '<div class="vb-heading">' . $label . '</div>';
+        }
+
+        $html = '<div class="vb-field" data-field-uuid="' . $uuid . '">';
+        $html .= '<label class="vb-label" for="vb-' . $uuid . '">' . $label . $reqMark . '</label>';
+
+        switch ($type) {
+            case 'textarea':
+                $rows = (int) ($field['settings']['rows'] ?? 4);
+                $html .= '<textarea id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-textarea" placeholder="' . $placeholder . '" rows="' . $rows . '"' . $reqAttr . '></textarea>';
+                break;
+
+            case 'dropdown':
+                $html .= '<select id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-select"' . $reqAttr . '>';
+                $html .= '<option value="">' . ($placeholder ?: 'Seçiniz...') . '</option>';
+                foreach ($field['options'] ?? [] as $opt) {
+                    $html .= '<option value="' . htmlspecialchars($opt['value']) . '">' . htmlspecialchars($opt['label']) . '</option>';
+                }
+                $html .= '</select>';
+                break;
+
+            case 'radio':
+                $html .= '<div class="vb-radio-group">';
+                foreach ($field['options'] ?? [] as $opt) {
+                    $optVal = htmlspecialchars($opt['value']);
+                    $html .= '<label class="vb-radio-item"><input type="radio" name="' . $uuid . '" value="' . $optVal . '"' . $reqAttr . '> ' . htmlspecialchars($opt['label']) . '</label>';
+                }
+                $html .= '</div>';
+                break;
+
+            case 'checkbox':
+                $html .= '<div class="vb-checkbox-group">';
+                foreach ($field['options'] ?? [] as $opt) {
+                    $optVal = htmlspecialchars($opt['value']);
+                    $html .= '<label class="vb-checkbox-item"><input type="checkbox" name="' . $uuid . '[]" value="' . $optVal . '"> ' . htmlspecialchars($opt['label']) . '</label>';
+                }
+                $html .= '</div>';
+                break;
+
+            case 'file':
+                $accept = implode(',', $field['validation']['file_types'] ?? []);
+                $multi  = !empty($field['settings']['multiple']) ? ' multiple' : '';
+                $html  .= '<input type="file" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input"' . ($accept ? ' accept="' . $accept . '"' : '') . $multi . $reqAttr . '>';
+                break;
+
+            case 'date':
+                $html .= '<input type="date" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input"' . $reqAttr . '>';
+                break;
+
+            case 'number':
+                $min  = isset($field['validation']['min']) ? ' min="' . (int)$field['validation']['min'] . '"' : '';
+                $max  = isset($field['validation']['max']) ? ' max="' . (int)$field['validation']['max'] . '"' : '';
+                $html .= '<input type="number" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input" placeholder="' . $placeholder . '"' . $min . $max . $reqAttr . '>';
+                break;
+
+            case 'email':
+                $html .= '<input type="email" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input" placeholder="' . $placeholder . '"' . $reqAttr . '>';
+                break;
+
+            case 'phone':
+                $html .= '<input type="tel" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input" placeholder="' . $placeholder . '"' . $reqAttr . '>';
+                break;
+
+            default: // input
+                $html .= '<input type="text" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input" placeholder="' . $placeholder . '"' . $reqAttr . '>';
+        }
+
+        if ($helpText) {
+            $html .= '<div class="vb-help">' . $helpText . '</div>';
+        }
+
+        $html .= '<div class="vb-error" data-error-for="' . $uuid . '" hidden></div>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     // -------------------------------------------------------------------------

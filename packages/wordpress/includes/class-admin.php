@@ -116,7 +116,12 @@ class Veribenim_Admin
             <?php if (!empty($token)): ?>
                 <p><?php _e('Bu kod otomatik olarak tüm sayfalara eklenmektedir:', 'veribenim'); ?></p>
                 <code style="display:block;padding:12px;background:#f0f0f1;border-left:4px solid #2271b1;">
-                    &lt;script src="<?php echo esc_html(get_option('veribenim_script_url')); ?>?token=<?php echo esc_html($token); ?>&amp;lang=<?php echo esc_html(get_option('veribenim_lang', 'tr')); ?>" async defer&gt;&lt;/script&gt;
+                    <?php
+                    $domain = get_option('veribenim_domain', home_url());
+                    $filename = Veribenim_Frontend::clean_domain_for_filename($domain);
+                    $bundle_url = "https://bundles.veribenim.com/{$filename}.js";
+                    ?>
+                    &lt;script src="<?php echo esc_html($bundle_url); ?>" async defer&gt;&lt;/script&gt;
                 </code>
             <?php endif; ?>
         </div>
