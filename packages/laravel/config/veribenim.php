@@ -12,6 +12,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Site Domain
+    |--------------------------------------------------------------------------
+    | Bundle script URL'ini oluşturmak için site domain'i.
+    | Örn: 'claude.com', 'example.com'
+    | Boş bırakılırsa @veribenimScript direktifi çalışmaz.
+    */
+    'domain' => env('VERIBENIM_DOMAIN', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Dil
     |--------------------------------------------------------------------------
     | 'tr' veya 'en'. Varsayılan: 'tr'
@@ -40,6 +50,6 @@ return [
     */
     'middleware' => [
         'redirect_to' => '/',
-        'required_categories' => ['necessary'],
+        'required_categories' => ['strictly_necessary'],
     ],
 ];

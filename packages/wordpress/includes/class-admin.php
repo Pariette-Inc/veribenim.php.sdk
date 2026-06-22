@@ -21,7 +21,7 @@ class Veribenim_Admin
     {
         register_setting('veribenim_settings', 'veribenim_token', [
             'type'              => 'string',
-            'sanitize_callback' => 'sanitize_text_field',
+            'sanitize_callback' => [$this, 'sanitize_token'],
             'default'           => '',
         ]);
 
@@ -71,8 +71,74 @@ class Veribenim_Admin
     public function render_token_field(): void
     {
         $token = esc_attr(get_option('veribenim_token', ''));
-        echo '<input type="text" name="veribenim_token" value="' . $token . '" class="regular-text" placeholder="32 karakterlik environment token" />';
+        // Token gizli tutulur — maskeleme ile shoulder-surfing riski azaltılır
+        echo '<input type="password" name="veribenim_token" value="' . $token . '" class="regular-text" placeholder="Environment token" autocomplete="off" />';
         echo '<p class="description">' . __('Veribenim panelinden > Siteniz > Entegrasyon bölümünden alın.', 'veribenim') . '</p>';
+    }
+
+    /**
+     * Token sanitizasyonu ve format doğrulaması.
+     * Boş bırakılırsa mevcut değer korunur.
+     */
+    public function sanitize_token(string $value): string
+    {
+        $value = sanitize_text_field(trim($value));
+
+        if ($value === '') {
+            return ''; // Temizlenmek isteniyor
+        }
+
+        // Token alfanümerik ve 20–128 karakter arası olmalı
+        if (! preg_match('/^[a-zA-Z0-9_\-]{20,128}$/', $value)) {
+            add_settings_error(
+                'veribenim_token',
+                'invalid_format',
+                __('Geçersiz token formatı. Token alfanümerik, 20-128 karakter arası olmalıdır.', 'veribenim'),
+                'error'
+            );
+            // Hatalı değer kabul edilmez — eski değer korunur
+            return (string) get_option('veribenim_token', '');
+        }
+
+        return $value;
+    }
+
+    /**
+     * AJAX: Bağlantı testi — nonce doğrulamalı.
+     * wp_ajax_veribenim_test_connection action'ına bağlıdır.
+     */
+    public function handle_test_connection(): void
+    {
+        // CSRF koruması
+        check_ajax_referer('veribenim_test_connection', 'nonce');
+
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Yetersiz yetki.', 'veribenim')], 403);
+        }
+
+        $token  = get_option('veribenim_token', '');
+        $apiUrl = rtrim((string) get_option('veribenim_api_url', 'https://live.veribenim.com'), '/');
+
+        if (empty($token)) {
+            wp_send_json_error(['message' => __('Token girilmemiş.', 'veribenim')]);
+        }
+
+        $domain   = parse_url(home_url(), PHP_URL_HOST) ?: '';
+        $response = wp_remote_get(
+            $apiUrl . '/api/public/verify/' . rawurlencode($domain),
+            ['timeout' => 8, 'sslverify' => true]
+        );
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(['message' => $response->get_error_message()]);
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code === 200) {
+            wp_send_json_success(['message' => __('Bağlantı başarılı.', 'veribenim'), 'code' => $code]);
+        } else {
+            wp_send_json_error(['message' => __('Bağlantı hatası.', 'veribenim'), 'code' => $code]);
+        }
     }
 
     public function render_lang_field(): void
@@ -111,12 +177,52 @@ class Veribenim_Admin
                 ?>
             </form>
 
+            <?php if (!empty($token)): ?>
+            <p>
+                <button type="button" id="vb-test-connection" class="button button-secondary">
+                    <?php _e('Bağlantıyı Test Et', 'veribenim'); ?>
+                </button>
+                <span id="vb-test-result" style="margin-left:10px;"></span>
+            </p>
+            <script>
+            document.getElementById('vb-test-connection').addEventListener('click', function() {
+                var btn = this;
+                var result = document.getElementById('vb-test-result');
+                btn.disabled = true;
+                result.textContent = '<?php echo esc_js(__('Test ediliyor...', 'veribenim')); ?>';
+
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=veribenim_test_connection&nonce=<?php echo esc_js(wp_create_nonce('veribenim_test_connection')); ?>'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    btn.disabled = false;
+                    if (res.success) {
+                        result.style.color = '#00a32a';
+                        result.textContent = '✓ ' + res.data.message;
+                    } else {
+                        result.style.color = '#d63638';
+                        result.textContent = '✗ ' + (res.data ? res.data.message : '<?php echo esc_js(__('Hata oluştu.', 'veribenim')); ?>');
+                    }
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    result.style.color = '#d63638';
+                    result.textContent = '✗ <?php echo esc_js(__('İstek gönderilemedi.', 'veribenim')); ?>';
+                });
+            });
+            </script>
+            <?php endif; ?>
+
             <hr>
             <h2><?php _e('Entegrasyon Kodu', 'veribenim'); ?></h2>
             <?php if (!empty($token)): ?>
                 <p><?php _e('Bu kod otomatik olarak tüm sayfalara eklenmektedir:', 'veribenim'); ?></p>
                 <code style="display:block;padding:12px;background:#f0f0f1;border-left:4px solid #2271b1;">
                     <?php
+                    $frontend = new Veribenim_Frontend();
                     $domain = get_option('veribenim_domain', home_url());
                     $filename = Veribenim_Frontend::clean_domain_for_filename($domain);
                     $bundle_url = "https://bundles.veribenim.com/{$filename}.js";

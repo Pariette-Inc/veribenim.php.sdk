@@ -38,15 +38,17 @@ class VeribenimClient
     // -------------------------------------------------------------------------
 
     /**
-     * @param string $action  accept_all | reject_all | save_preferences | ping | visit | exit
-     * @param array|null $preferences ['necessary'=>true, 'analytics'=>bool, 'marketing'=>bool, 'preferences'=>bool]
+     * @param string $action  accept_all | reject_all | save_preferences | withdraw | ping | visit | exit
+     * @param array|null $preferences Kategori bazlı rıza. Platform anahtarları:
+     *                   ['strictly_necessary'=>true, 'functional'=>bool, 'analytics'=>bool, 'marketing'=>bool]
+     *                   Platforma `consents` alanı olarak gönderilir.
      */
     public function logConsent(string $action, ?array $preferences = null, ?string $sessionId = null): bool
     {
         $data = ['action' => $action];
 
         if ($preferences !== null) {
-            $data['preferences'] = $preferences;
+            $data['consents'] = $preferences;
         }
         if ($sessionId !== null) {
             $data['session_id'] = $sessionId;
@@ -66,9 +68,14 @@ class VeribenimClient
         return $this->get("/api/preferences/{$this->config->token}{$qs}");
     }
 
+    /**
+     * @param array $preferences Kategori bazlı rıza (platform anahtarları:
+     *              strictly_necessary, functional, analytics, marketing).
+     *              Platforma `consents` alanı olarak gönderilir.
+     */
     public function savePreferences(array $preferences, ?string $sessionId = null): ?array
     {
-        $data = ['preferences' => $preferences];
+        $data = ['consents' => $preferences];
         if ($sessionId !== null) {
             $data['session_id'] = $sessionId;
         }
@@ -344,6 +351,92 @@ class VeribenimClient
     }
 
     // -------------------------------------------------------------------------
+    // Web Analytics — Gizlilik-öncelikli hit toplama (sendBeacon uyumlu, 204)
+    // POST /api/v/{token}/e
+    // -------------------------------------------------------------------------
+
+    /**
+     * Web analytics hit gönderir (sunucu tarafı / SSR senaryoları için;
+     * tarayıcıda genellikle bundle ya da JS SDK kullanılır).
+     *
+     * @param array $payload  Zorunlu: 'sid' (session UUID), 'url'.
+     *                        Opsiyonel: 'vid','title','ref','res','lang',
+     *                        'utm_source','utm_medium','utm_campaign','utm_term','utm_content',
+     *                        'scroll','ttp','hm','lt'
+     * @return bool  2xx/204 ise true
+     */
+    public function collectAnalytics(array $payload): bool
+    {
+        if (empty($payload['sid']) || empty($payload['url'])) {
+            throw new \InvalidArgumentException('[Veribenim] collectAnalytics: "sid" ve "url" zorunludur');
+        }
+        return $this->postBeacon("/api/v/{$this->config->token}/e", $payload);
+    }
+
+    // -------------------------------------------------------------------------
+    // Çerez Tarama (public — token gerekmez)
+    // POST /api/public/cookie-scan
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verilen URL'i tarayıp tespit edilen tracker/çerez sağlayıcılarını döner.
+     *
+     * @param string $url  Taranacak tam URL (http/https)
+     * @return array|null  ['status'=>bool,'detected'=>[...],'scanned_url'=>...,'count'=>int] veya null
+     */
+    public function scanCookies(string $url): ?array
+    {
+        return $this->post('/api/public/cookie-scan', ['url' => $url]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Domain Doğrulama (public — token gerekmez)
+    // GET /api/public/verify/{domain}
+    // -------------------------------------------------------------------------
+
+    /**
+     * Bir domain'in Veribenim'de kayıtlı/aktif olup olmadığını döner
+     * ("bağlantı testi" gibi senaryolar için).
+     *
+     * @param string|null $domain  Belirtilmezse config->domain kullanılır.
+     * @return array|null  ['found'=>bool, ...] veya null
+     */
+    public function verifyDomain(?string $domain = null): ?array
+    {
+        $domain = $domain ?? $this->config->domain;
+        if (empty($domain)) {
+            throw new \InvalidArgumentException('[Veribenim] verifyDomain: domain gerekli');
+        }
+        // protokol / www / path temizle
+        $clean = preg_replace('#^https?://#', '', strtolower($domain));
+        $clean = preg_replace('#^www\.#', '', (string) $clean);
+        $clean = explode('/', (string) $clean)[0];
+        return $this->get('/api/public/verify/' . rawurlencode($clean));
+    }
+
+    // -------------------------------------------------------------------------
+    // Impression Pixel — <img> fallback (JS çalışmayan ortamlar / e-posta)
+    // GET /api/impressions/{token}/pixel
+    // -------------------------------------------------------------------------
+
+    /**
+     * 1x1 pixel impression URL'i üretir. <img src="..."> olarak kullanın.
+     *
+     * @param array $opts  ['url'=>?, 'session_id'=>?, 'referrer'=>?, 'domain'=>?]
+     * @return string
+     */
+    public function impressionPixelUrl(array $opts = []): string
+    {
+        $params = [];
+        if (!empty($opts['url']))        $params['u'] = $opts['url'];
+        if (!empty($opts['domain']))     $params['d'] = $opts['domain'];
+        if (!empty($opts['session_id'])) $params['s'] = $opts['session_id'];
+        if (!empty($opts['referrer']))   $params['r'] = $opts['referrer'];
+        $qs = $params ? '?' . http_build_query($params) : '';
+        return rtrim($this->config->apiUrl, '/') . "/api/impressions/{$this->config->token}/pixel" . $qs;
+    }
+
+    // -------------------------------------------------------------------------
     // HTTP helpers (curl — ext-curl opsiyonel, fallback: file_get_contents)
     // -------------------------------------------------------------------------
 
@@ -355,6 +448,60 @@ class VeribenimClient
     private function post(string $path, array $body): ?array
     {
         return $this->request('POST', $path, $body);
+    }
+
+    /**
+     * Gövde döndürmeyen (204) uçlar için POST: 2xx ise true.
+     * request()/post() boş gövdeyi null'a çevirdiğinden başarı ayırt edilemez;
+     * bu helper HTTP durum koduna bakar.
+     */
+    private function postBeacon(string $path, array $body): bool
+    {
+        $url = rtrim($this->config->apiUrl, '/') . $path;
+
+        if ($this->config->debug) {
+            error_log("[Veribenim] POST(beacon) {$url}");
+        }
+
+        if (extension_loaded('curl')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => $this->config->timeout,
+                CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                CURLOPT_CUSTOMREQUEST  => 'POST',
+                CURLOPT_POSTFIELDS     => json_encode($body),
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+            $ok = curl_exec($ch) !== false;
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            return $ok && $httpCode >= 200 && $httpCode < 300;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Content-Type: application/json\r\nAccept: application/json",
+                'content'       => json_encode($body),
+                'timeout'       => $this->config->timeout,
+                'ignore_errors' => true,
+            ],
+            'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false) {
+            return false;
+        }
+
+        // PHP $http_response_header global'inden durum kodunu çöz
+        $code = 0;
+        if (isset($http_response_header[0]) && preg_match('#\s(\d{3})\s#', $http_response_header[0], $m)) {
+            $code = (int) $m[1];
+        }
+        return $code >= 200 && $code < 300;
     }
 
     private function request(string $method, string $path, ?array $body = null): ?array
@@ -382,6 +529,9 @@ class VeribenimClient
             CURLOPT_TIMEOUT        => $this->config->timeout,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_CUSTOMREQUEST  => $method,
+            // SSL sertifikası doğrulaması — MITM saldırılarına karşı
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
 
         if ($body !== null) {
@@ -403,11 +553,16 @@ class VeribenimClient
     {
         $context = stream_context_create([
             'http' => [
-                'method'  => $method,
-                'header'  => "Content-Type: application/json\r\nAccept: application/json",
-                'content' => $body ? json_encode($body) : null,
-                'timeout' => $this->config->timeout,
+                'method'        => $method,
+                'header'        => "Content-Type: application/json\r\nAccept: application/json",
+                'content'       => $body ? json_encode($body) : null,
+                'timeout'       => $this->config->timeout,
                 'ignore_errors' => true,
+            ],
+            // HTTPS bağlantılarında SSL sertifikası doğrulaması
+            'ssl' => [
+                'verify_peer'      => true,
+                'verify_peer_name' => true,
             ],
         ]);
 

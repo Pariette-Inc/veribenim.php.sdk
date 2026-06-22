@@ -33,14 +33,17 @@ class Veribenim_Frontend
 
     /**
      * Bundle URL'ini domain'den türetir.
+     * Öncelik: veribenim_script_url (manuel override) > veribenim_domain > site URL
      */
     private function resolve_bundle_url(): string
     {
+        // Manuel override varsa kullan
         $custom_url = get_option('veribenim_script_url', '');
         if (!empty($custom_url) && $custom_url !== 'https://bundles.veribenim.com/bundle.js') {
             return $custom_url;
         }
 
+        // Domain ayarından veya site URL'inden türet
         $domain = get_option('veribenim_domain', '');
         if (empty($domain)) {
             $domain = home_url();

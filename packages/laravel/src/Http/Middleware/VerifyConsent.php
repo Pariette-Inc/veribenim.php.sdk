@@ -34,15 +34,15 @@ class VerifyConsent
 
         $prefs = $this->client->getPreferences($sessionId);
 
-        if (!$prefs || !isset($prefs['preferences'])) {
+        if (!$prefs || !isset($prefs['current_consents'])) {
             return $request->expectsJson()
                 ? response()->json(['error' => 'Çerez rızası gereklidir'], 403)
                 : redirect($redirectTo);
         }
 
-        $userPrefs = $prefs['preferences'];
+        $userPrefs = $prefs['current_consents'];
         $requiredCategories = empty($categories)
-            ? config('veribenim.middleware.required_categories', ['necessary'])
+            ? config('veribenim.middleware.required_categories', ['strictly_necessary'])
             : $categories;
 
         foreach ($requiredCategories as $category) {

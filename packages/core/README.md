@@ -2,6 +2,8 @@
 
 > Veribenim KVKK & GDPR çerez onayı SDK — PHP
 
+> ⚠️ **Bakım notu (kanonik kaynak):** Bu dizin (`packages/core`), repo kökündeki `/src` ile **birebir aynı** tutulan bir kopyadır. Kanonik/aktif geliştirme kaynağı **repo kökündeki `/src`'tir**. Değişiklikleri kök `/src`'te yapın ve buraya senkronlayın (uzun vadede bu kopyayı kaldırıp tek kaynağa inmek önerilir). İki kopyanın sapması daha önce bir bug'a (eksik `domain`/`getBundleUrl` + form metotları) yol açmıştı.
+
 [![Packagist](https://img.shields.io/packagist/v/veribenim/php-sdk)](https://packagist.org/packages/veribenim/php-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![PHP](https://img.shields.io/packagist/php-v/veribenim/php-sdk)](https://packagist.org/packages/veribenim/php-sdk)
