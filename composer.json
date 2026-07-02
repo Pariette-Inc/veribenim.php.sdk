@@ -10,6 +10,7 @@
     "ext-json": "*"
   },
   "require-dev": {
+    "orchestra/testbench": "^9.0",
     "phpunit/phpunit": "^11.0"
   },
   "autoload": {
@@ -19,8 +20,14 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Veribenim\\Tests\\": "tests/"
+      "Veribenim\\Tests\\": "packages/core/tests/",
+      "Veribenim\\Laravel\\": "packages/laravel/src/",
+      "Veribenim\\Laravel\\Tests\\": "packages/laravel/tests/",
+      "Veribenim\\WordPress\\Tests\\": "packages/wordpress/tests/"
     }
+  },
+  "scripts": {
+    "test": "phpunit"
   },
   "minimum-stability": "stable",
   "prefer-stable": true,

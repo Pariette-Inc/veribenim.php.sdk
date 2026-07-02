@@ -1,0 +1,4 @@
+# WordPress.org dağıtımına dahil edilmeyecek dosyalar
+/tests
+/.distignore
+/README.md

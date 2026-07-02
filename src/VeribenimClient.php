@@ -440,12 +440,12 @@ class VeribenimClient
     // HTTP helpers (curl — ext-curl opsiyonel, fallback: file_get_contents)
     // -------------------------------------------------------------------------
 
-    private function get(string $path): ?array
+    protected function get(string $path): ?array
     {
         return $this->request('GET', $path);
     }
 
-    private function post(string $path, array $body): ?array
+    protected function post(string $path, array $body): ?array
     {
         return $this->request('POST', $path, $body);
     }
@@ -455,7 +455,7 @@ class VeribenimClient
      * request()/post() boş gövdeyi null'a çevirdiğinden başarı ayırt edilemez;
      * bu helper HTTP durum koduna bakar.
      */
-    private function postBeacon(string $path, array $body): bool
+    protected function postBeacon(string $path, array $body): bool
     {
         $url = rtrim($this->config->apiUrl, '/') . $path;
 
@@ -504,7 +504,7 @@ class VeribenimClient
         return $code >= 200 && $code < 300;
     }
 
-    private function request(string $method, string $path, ?array $body = null): ?array
+    protected function request(string $method, string $path, ?array $body = null): ?array
     {
         $url = rtrim($this->config->apiUrl, '/') . $path;
 
