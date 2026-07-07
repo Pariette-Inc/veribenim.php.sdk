@@ -26,16 +26,12 @@ class Veribenim_Plugin
             add_action('wp_ajax_veribenim_test_connection', [$this->admin, 'handle_test_connection']);
         }
 
-        // Frontend
-        add_action('wp_head', [$this->frontend, 'inject_script'], 1);
+        // Frontend — banner script'i kuyruğa ekle + attribute'ları filtrele
+        add_action('wp_enqueue_scripts', [$this->frontend, 'enqueue_script']);
+        add_filter('script_loader_tag', [$this->frontend, 'add_script_attributes'], 10, 2);
 
         // Form Generator shortcode: [veribenim_form slug="iletisim-formu"]
         add_shortcode('veribenim_form', [$this, 'render_form_shortcode']);
-
-        // Dil desteği
-        add_action('init', function () {
-            load_plugin_textdomain('veribenim', false, dirname(plugin_basename(VERIBENIM_PLUGIN_FILE)) . '/languages');
-        });
 
     }
 

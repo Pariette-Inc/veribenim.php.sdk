@@ -1,6 +1,6 @@
 === Veribenim KVKK & GDPR Çerez Yönetimi ===
 Contributors: pariette
-Tags: kvkk, gdpr, cookie-consent, privacy, consent
+Tags: cookie-consent, gdpr, privacy, consent, cookie-banner
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.1
@@ -8,87 +8,87 @@ Stable tag: 0.4.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
-KVKK ve GDPR uyumlu çerez onay banner'ı. Veribenim hesabınızla bağlayın, çerez yönetimini ve rıza kayıtlarını otomatikleştirin.
+Add a KVKK- and GDPR-compliant cookie consent banner to your site and manage visitor consent records through your Veribenim account.
 
 == Description ==
 
-Veribenim WordPress eklentisi, sitenize KVKK ve GDPR uyumlu bir çerez onay banner'ı ekler ve ziyaretçi rıza kayıtlarını Veribenim platformunda saklar.
+Veribenim adds a KVKK- and GDPR-compliant cookie consent banner to your WordPress site and stores visitor consent records in the Veribenim platform.
 
-Özellikler:
+Features:
 
-* Çerez onay banner'ının otomatik enjeksiyonu (Veribenim bundle).
-* Ziyaretçi rıza kategorileri: zorunlu, işlevsel, analitik, pazarlama.
-* `[veribenim_form]` kısa kodu ile KVKK/iletişim formlarını sunucu tarafında veya JS ile render etme.
-* Yönetici panelinde token doğrulaması ve bağlantı testi.
-* Veribenim hesabınızdaki çerez taraması, tercih merkezi ve DSAR akışlarıyla entegrasyon.
-* Google Consent Mode v2 ve IAB TCF v2.2 sinyalleri (bundle üzerinden).
+* Automatic injection of the cookie consent banner (Veribenim bundle).
+* Visitor consent categories: strictly necessary, functional, analytics, marketing.
+* Render KVKK/contact forms server-side or via JavaScript with the `[veribenim_form]` shortcode.
+* Token validation and connection testing from the admin panel.
+* Integration with the cookie scanner, preference center, and DSAR flows in your Veribenim account.
+* Google Consent Mode v2 and IAB TCF v2.2 signals (through the bundle).
 
-Kullanmak için bir [Veribenim](https://veribenim.com) hesabı ve ortam (environment) token'ı gerekir.
+A [Veribenim](https://veribenim.com) account and an environment token are required to use this plugin.
 
 == External services ==
 
-Bu eklenti, çalışmak için Veribenim platformuna (Pariette tarafından işletilir) bağlanır. Aşağıdaki harici istekler yapılır:
+This plugin connects to the Veribenim platform (operated by Pariette) in order to function. The following external requests are made:
 
-1. **Banner script'i** — `https://bundles.veribenim.com/{site-domain}.js` adresinden ziyaretçi tarayıcısına çerez onay banner'ı yüklenir. Bu istek sırasında ziyaretçinin IP adresi ve tarayıcı bilgisi (user agent) CDN'e iletilir.
-2. **Bağlantı testi** — Yönetici panelindeki "Bağlantıyı Test Et" butonu, site domain'inizi `https://live.veribenim.com/api/public/verify/{domain}` adresine gönderir.
-3. **Form şeması ve gönderimleri** — `[veribenim_form]` kısa kodu kullanılıyorsa, form şeması `https://live.veribenim.com` üzerinden çekilir ve ziyaretçinin form yanıtları (girilen tüm alanlar) aynı adrese gönderilir.
-4. **Rıza kayıtları** — Ziyaretçi banner üzerinden rıza kararı verdiğinde bu karar, banner script'i tarafından Veribenim API'sine kaydedilir (session kimliği, rıza kategorileri, maskelenmiş IP).
+1. **Banner script** — the cookie consent banner is loaded into the visitor's browser from `https://bundles.veribenim.com/{site-domain}.js`. During this request the visitor's IP address and user agent are sent to the CDN.
+2. **Connection test** — the "Test connection" button in the admin panel sends your site domain to `https://live.veribenim.com/api/public/verify/{domain}`.
+3. **Form schema and submissions** — when the `[veribenim_form]` shortcode is used, the form schema is fetched from `https://live.veribenim.com` and the visitor's form responses (all submitted fields) are sent to the same host.
+4. **Consent records** — when a visitor makes a consent decision through the banner, that decision is recorded to the Veribenim API by the banner script (session id, consent categories, masked IP).
 
-Bu veriler KVKK/GDPR rıza kayıtlarının yasal saklama yükümlülüğü kapsamında Veribenim altyapısında saklanır.
+These records are stored on Veribenim infrastructure to meet the legal retention obligations for KVKK/GDPR consent records.
 
-* Hizmet: [Veribenim](https://veribenim.com)
-* Kullanım şartları: https://veribenim.com/legal/operasyon-kosullari
-* Gizlilik politikası: https://veribenim.com/gizlilik-politikasi
+* Service: [Veribenim](https://veribenim.com)
+* Terms of service: https://veribenim.com/legal/operasyon-kosullari
+* Privacy policy: https://veribenim.com/gizlilik-politikasi
 
 == Installation ==
 
-1. Eklentiyi yükleyin ve etkinleştirin.
-2. **Ayarlar → Veribenim** sayfasına gidin.
-3. Veribenim panelinizden aldığınız ortam token'ını girin (Siteniz → Entegrasyon).
-4. "Bağlantıyı test et" ile doğrulayın. Banner siteye otomatik eklenir.
+1. Install and activate the plugin.
+2. Go to **Settings → Veribenim**.
+3. Enter the environment token from your Veribenim panel (Your site → Integration).
+4. Verify with "Test connection". The banner is added to your site automatically.
 
 == Frequently Asked Questions ==
 
-= Veribenim hesabı gerekli mi? =
+= Is a Veribenim account required? =
 
-Evet. Banner ve rıza kayıtları Veribenim platformuna bağlıdır; ücretsiz hesap oluşturup token alabilirsiniz.
+Yes. The banner and consent records are tied to the Veribenim platform; you can create a free account and obtain a token.
 
-= Verilerim nerede saklanıyor? =
+= Where is my data stored? =
 
-Rıza kayıtları ve ziyaretçi tercihleri Veribenim altyapısında (Türkiye'de) saklanır.
+Consent records and visitor preferences are stored on Veribenim infrastructure (in Türkiye).
 
-= Eklenti hangi harici servislere bağlanır? =
+= Which external services does the plugin connect to? =
 
-Banner script'i `bundles.veribenim.com` adresinden yüklenir; rıza kayıtları, bağlantı testi ve form gönderimleri `live.veribenim.com` API'sine gider. Ayrıntılar "External services" bölümündedir.
+The banner script is loaded from `bundles.veribenim.com`; consent records, connection tests, and form submissions go to the `live.veribenim.com` API. See the "External services" section for details.
 
-= Eklentiyi silersem verilerime ne olur? =
+= What happens to my data if I delete the plugin? =
 
-Eklenti silindiğinde WordPress'teki tüm Veribenim ayarları (token dahil) temizlenir. Platformdaki rıza kayıtlarınız Veribenim hesabınızda kalır.
+When the plugin is deleted, all Veribenim settings in WordPress (including the token) are removed. Your consent records on the platform remain in your Veribenim account.
 
 == Changelog ==
 
 = 0.4.0 =
-* WordPress.org gönderim hazırlığı: harici servis bildirimi, uninstall temizliği, çeviri şablonu (.pot).
-* Eklenti silindiğinde tüm veribenim_* ayarları otomatik temizlenir (multisite dahil).
-* `languages/veribenim.pot` çeviri şablonu eklendi.
-* Kullanılmayan REST API placeholder'ı kaldırıldı.
+* WordPress.org submission readiness: external service disclosure, uninstall cleanup, translation template (.pot).
+* Banner script now loaded through wp_enqueue_script.
+* All output escaped and internationalization functions hardened per Plugin Check.
+* All veribenim_* settings are removed automatically on uninstall (including multisite).
 
 = 0.3.0 =
-* Çerez tarama, web analytics ve domain doğrulama uçları için SDK desteği.
-* Rıza veri modeli platformla hizalandı (kategori anahtarları: strictly_necessary, functional, analytics, marketing).
-* `[veribenim_form]` kısa kodu, bağlantı testi ve token doğrulaması.
-* Çeşitli kararlılık düzeltmeleri.
+* SDK support for cookie scanning, web analytics, and domain verification endpoints.
+* Consent data model aligned with the platform (category keys: strictly_necessary, functional, analytics, marketing).
+* `[veribenim_form]` shortcode, connection test, and token validation.
+* Various stability fixes.
 
 = 0.2.0 =
-* Ara sürüm.
+* Interim release.
 
 = 0.1.0 =
-* İlk sürüm.
+* Initial release.
 
 == Upgrade Notice ==
 
 = 0.4.0 =
-WordPress.org uyumluluk sürümü. Eklenti silme işlemi artık tüm ayarları temizler; token'ınızı not almadan silmeyin.
+WordPress.org compliance release. Deleting the plugin now removes all settings; note down your token before deleting.
 
 = 0.3.0 =
-Rıza veri modeli platform kategori anahtarlarıyla hizalandı. Özel entegrasyonlar için kategori anahtarlarını (strictly_necessary, functional, analytics, marketing) güncelleyin.
+Consent data model aligned with platform category keys. Update your custom integrations to the category keys (strictly_necessary, functional, analytics, marketing).

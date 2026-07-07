@@ -33,17 +33,21 @@ class VeribenimWpTestState
     /** @var array<string, callable> add_shortcode kayıtları */
     public static array $shortcodes = [];
 
+    /** @var array<int, array{handle:string, src:string, deps:array, ver:mixed, in_footer:bool}> */
+    public static array $enqueuedScripts = [];
+
     public static function reset(): void
     {
-        self::$options        = [];
-        self::$isAdmin        = false;
-        self::$currentUserCan = true;
-        self::$homeUrl        = 'https://claude.com';
-        self::$remoteResponse = null;
-        self::$remoteRequests = [];
-        self::$settingsErrors = [];
-        self::$actions        = [];
-        self::$shortcodes     = [];
+        self::$options         = [];
+        self::$isAdmin         = false;
+        self::$currentUserCan  = true;
+        self::$homeUrl         = 'https://claude.com';
+        self::$remoteResponse  = null;
+        self::$remoteRequests  = [];
+        self::$settingsErrors  = [];
+        self::$actions         = [];
+        self::$shortcodes      = [];
+        self::$enqueuedScripts = [];
 
         self::bindFallbackTranslator();
     }
@@ -179,6 +183,13 @@ if (! function_exists('add_action')) {
     }
 }
 
+if (! function_exists('add_filter')) {
+    function add_filter($hook, $callback, $priority = 10, $args = 1): void
+    {
+        VeribenimWpTestState::$actions[$hook][] = ['callback' => $callback, 'priority' => $priority];
+    }
+}
+
 if (! function_exists('add_shortcode')) {
     function add_shortcode($tag, $callback): void
     {
@@ -218,6 +229,28 @@ if (! function_exists('home_url')) {
     function home_url($path = ''): string
     {
         return VeribenimWpTestState::$homeUrl . $path;
+    }
+}
+
+if (! function_exists('wp_parse_url')) {
+    function wp_parse_url($url, $component = -1)
+    {
+        return parse_url((string) $url, $component);
+    }
+}
+
+// --- Scripts -------------------------------------------------------------
+
+if (! function_exists('wp_enqueue_script')) {
+    function wp_enqueue_script($handle, $src = '', $deps = [], $ver = false, $in_footer = false): void
+    {
+        VeribenimWpTestState::$enqueuedScripts[] = [
+            'handle'    => $handle,
+            'src'       => $src,
+            'deps'      => $deps,
+            'ver'       => $ver,
+            'in_footer' => (bool) $in_footer,
+        ];
     }
 }
 

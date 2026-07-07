@@ -49,68 +49,94 @@ class FrontendTest extends TestCase
         }
     }
 
-    public function test_inject_script_outputs_nothing_without_token(): void
+    public function test_enqueue_outputs_nothing_without_token(): void
     {
-        $this->assertSame('', $this->captureInjectScript());
+        (new Veribenim_Frontend())->enqueue_script();
+
+        $this->assertSame([], VeribenimWpTestState::$enqueuedScripts);
     }
 
-    public function test_inject_script_outputs_nothing_in_admin(): void
+    public function test_enqueue_outputs_nothing_in_admin(): void
     {
         VeribenimWpTestState::$options['veribenim_token'] = str_repeat('a', 32);
         VeribenimWpTestState::$isAdmin = true;
 
-        $this->assertSame('', $this->captureInjectScript());
+        (new Veribenim_Frontend())->enqueue_script();
+
+        $this->assertSame([], VeribenimWpTestState::$enqueuedScripts);
     }
 
-    public function test_inject_script_derives_bundle_url_from_domain_option(): void
+    public function test_enqueue_derives_bundle_url_from_domain_option(): void
     {
         VeribenimWpTestState::$options['veribenim_token']  = str_repeat('a', 32);
         VeribenimWpTestState::$options['veribenim_domain'] = 'https://www.claude.com';
 
-        $output = $this->captureInjectScript();
+        (new Veribenim_Frontend())->enqueue_script();
 
-        $this->assertStringContainsString('src="https://bundles.veribenim.com/claudecom.js"', $output);
-        $this->assertStringContainsString('async defer', $output);
-        $this->assertStringContainsString('data-veribenim="' . str_repeat('a', 32) . '"', $output);
+        $script = VeribenimWpTestState::$enqueuedScripts[0] ?? [];
+        $this->assertSame('veribenim-banner', $script['handle'] ?? null);
+        $this->assertSame('https://bundles.veribenim.com/claudecom.js', $script['src'] ?? null);
+        $this->assertFalse($script['in_footer'] ?? null);
     }
 
-    public function test_inject_script_falls_back_to_home_url(): void
+    public function test_enqueue_falls_back_to_home_url(): void
     {
         VeribenimWpTestState::$options['veribenim_token'] = str_repeat('a', 32);
         VeribenimWpTestState::$homeUrl = 'https://www.mysite.example';
 
-        $output = $this->captureInjectScript();
+        (new Veribenim_Frontend())->enqueue_script();
 
-        $this->assertStringContainsString('src="https://bundles.veribenim.com/mysiteexample.js"', $output);
+        $this->assertSame(
+            'https://bundles.veribenim.com/mysiteexample.js',
+            VeribenimWpTestState::$enqueuedScripts[0]['src'] ?? null
+        );
     }
 
-    public function test_inject_script_uses_manual_script_url_override(): void
+    public function test_enqueue_uses_manual_script_url_override(): void
     {
         VeribenimWpTestState::$options['veribenim_token']      = str_repeat('a', 32);
         VeribenimWpTestState::$options['veribenim_script_url'] = 'https://cdn.example.com/ozel.js';
 
-        $output = $this->captureInjectScript();
+        (new Veribenim_Frontend())->enqueue_script();
 
-        $this->assertStringContainsString('src="https://cdn.example.com/ozel.js"', $output);
+        $this->assertSame(
+            'https://cdn.example.com/ozel.js',
+            VeribenimWpTestState::$enqueuedScripts[0]['src'] ?? null
+        );
     }
 
-    public function test_inject_script_ignores_default_placeholder_script_url(): void
+    public function test_enqueue_ignores_default_placeholder_script_url(): void
     {
         VeribenimWpTestState::$options['veribenim_token']      = str_repeat('a', 32);
         VeribenimWpTestState::$options['veribenim_script_url'] = 'https://bundles.veribenim.com/bundle.js';
         VeribenimWpTestState::$options['veribenim_domain']     = 'claude.com';
 
-        $output = $this->captureInjectScript();
+        (new Veribenim_Frontend())->enqueue_script();
 
         // Placeholder yok sayılır, domain'den türetilir
-        $this->assertStringContainsString('src="https://bundles.veribenim.com/claudecom.js"', $output);
+        $this->assertSame(
+            'https://bundles.veribenim.com/claudecom.js',
+            VeribenimWpTestState::$enqueuedScripts[0]['src'] ?? null
+        );
     }
 
-    private function captureInjectScript(): string
+    public function test_add_script_attributes_injects_token_and_flags(): void
     {
-        ob_start();
-        (new Veribenim_Frontend())->inject_script();
+        VeribenimWpTestState::$options['veribenim_token'] = str_repeat('a', 32);
 
-        return (string) ob_get_clean();
+        $tag = "<script src='https://bundles.veribenim.com/claudecom.js' id='veribenim-banner-js'></script>\n";
+        $out = (new Veribenim_Frontend())->add_script_attributes($tag, 'veribenim-banner');
+
+        $this->assertStringContainsString('async defer', $out);
+        $this->assertStringContainsString('data-veribenim="' . str_repeat('a', 32) . '"', $out);
+        $this->assertStringContainsString("src='https://bundles.veribenim.com/claudecom.js'", $out);
+    }
+
+    public function test_add_script_attributes_ignores_other_handles(): void
+    {
+        $tag = "<script src='https://example.com/other.js' id='other-js'></script>\n";
+        $out = (new Veribenim_Frontend())->add_script_attributes($tag, 'other');
+
+        $this->assertSame($tag, $out);
     }
 }

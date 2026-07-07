@@ -7,27 +7,41 @@ if (! defined('ABSPATH')) exit;
 class Veribenim_Frontend
 {
     /**
-     * Banner scriptini <head> içine enjekte eder.
-     * wp_head hook'una bağlıdır (priority: 1 — mümkün olduğunca erken).
+     * Banner scriptini WordPress script kuyruğuna ekler (<head>).
+     * wp_enqueue_scripts hook'una bağlıdır.
      */
-    public function inject_script(): void
+    public function enqueue_script(): void
     {
         $token = get_option('veribenim_token', '');
 
         if (empty($token)) return;
 
-        // Admin, login ve WP-Cron sayfalarında yükleme
+        // Admin ve WP-Cron isteklerinde yükleme
         if (is_admin() || (defined('DOING_CRON') && DOING_CRON)) return;
 
         $script_url = $this->resolve_bundle_url();
         if (empty($script_url)) return;
 
-        $token_attr = esc_attr($token);
+        // Sürüm null: bundle kendi cache-busting'ini yapar. in_footer=false → <head>.
+        wp_enqueue_script('veribenim-banner', $script_url, [], null, false);
+    }
 
-        printf(
-            '<script src="%s" async defer data-veribenim="%s"></script>' . PHP_EOL,
-            esc_url($script_url),
-            $token_attr
+    /**
+     * veribenim-banner script tag'ine async/defer ve data-veribenim ekler.
+     * script_loader_tag filtresine bağlıdır.
+     */
+    public function add_script_attributes(string $tag, string $handle): string
+    {
+        if ($handle !== 'veribenim-banner') {
+            return $tag;
+        }
+
+        $token = esc_attr((string) get_option('veribenim_token', ''));
+
+        return str_replace(
+            ' src=',
+            ' async defer data-veribenim="' . $token . '" src=',
+            $tag
         );
     }
 

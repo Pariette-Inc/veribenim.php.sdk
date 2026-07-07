@@ -41,8 +41,8 @@ class PluginTest extends TestCase
     {
         $this->plugin->run();
 
-        $this->assertArrayHasKey('wp_head', VeribenimWpTestState::$actions);
-        $this->assertSame(1, VeribenimWpTestState::$actions['wp_head'][0]['priority']);
+        $this->assertArrayHasKey('wp_enqueue_scripts', VeribenimWpTestState::$actions);
+        $this->assertArrayHasKey('script_loader_tag', VeribenimWpTestState::$actions);
         $this->assertArrayHasKey('veribenim_form', VeribenimWpTestState::$shortcodes);
         // is_admin=false → admin hook'ları kaydedilmez
         $this->assertArrayNotHasKey('admin_menu', VeribenimWpTestState::$actions);

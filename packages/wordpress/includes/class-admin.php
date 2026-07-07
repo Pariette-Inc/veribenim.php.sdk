@@ -70,10 +70,12 @@ class Veribenim_Admin
 
     public function render_token_field(): void
     {
-        $token = esc_attr(get_option('veribenim_token', ''));
         // Token gizli tutulur — maskeleme ile shoulder-surfing riski azaltılır
-        echo '<input type="password" name="veribenim_token" value="' . $token . '" class="regular-text" placeholder="Environment token" autocomplete="off" />';
-        echo '<p class="description">' . __('Veribenim panelinden > Siteniz > Entegrasyon bölümünden alın.', 'veribenim') . '</p>';
+        printf(
+            '<input type="password" name="veribenim_token" value="%s" class="regular-text" placeholder="Environment token" autocomplete="off" />',
+            esc_attr((string) get_option('veribenim_token', ''))
+        );
+        echo '<p class="description">' . esc_html__('Veribenim panelinden > Siteniz > Entegrasyon bölümünden alın.', 'veribenim') . '</p>';
     }
 
     /**
@@ -123,7 +125,7 @@ class Veribenim_Admin
             wp_send_json_error(['message' => __('Token girilmemiş.', 'veribenim')]);
         }
 
-        $domain   = parse_url(home_url(), PHP_URL_HOST) ?: '';
+        $domain   = wp_parse_url(home_url(), PHP_URL_HOST) ?: '';
         $response = wp_remote_get(
             $apiUrl . '/api/public/verify/' . rawurlencode($domain),
             ['timeout' => 8, 'sslverify' => true]
@@ -161,11 +163,11 @@ class Veribenim_Admin
 
             <?php if (empty($token)): ?>
                 <div class="notice notice-warning">
-                    <p><?php _e('Veribenim token henüz girilmemiş. Aşağıya Veribenim panelinizdeki token\'ı girin.', 'veribenim'); ?></p>
+                    <p><?php esc_html_e('Veribenim token henüz girilmemiş. Aşağıya Veribenim panelinizdeki token\'ı girin.', 'veribenim'); ?></p>
                 </div>
             <?php else: ?>
                 <div class="notice notice-success">
-                    <p><?php _e('Veribenim aktif ve çalışıyor.', 'veribenim'); ?></p>
+                    <p><?php esc_html_e('Veribenim aktif ve çalışıyor.', 'veribenim'); ?></p>
                 </div>
             <?php endif; ?>
 
@@ -180,7 +182,7 @@ class Veribenim_Admin
             <?php if (!empty($token)): ?>
             <p>
                 <button type="button" id="vb-test-connection" class="button button-secondary">
-                    <?php _e('Bağlantıyı Test Et', 'veribenim'); ?>
+                    <?php esc_html_e('Bağlantıyı Test Et', 'veribenim'); ?>
                 </button>
                 <span id="vb-test-result" style="margin-left:10px;"></span>
             </p>
@@ -217,9 +219,9 @@ class Veribenim_Admin
             <?php endif; ?>
 
             <hr>
-            <h2><?php _e('Entegrasyon Kodu', 'veribenim'); ?></h2>
+            <h2><?php esc_html_e('Entegrasyon Kodu', 'veribenim'); ?></h2>
             <?php if (!empty($token)): ?>
-                <p><?php _e('Bu kod otomatik olarak tüm sayfalara eklenmektedir:', 'veribenim'); ?></p>
+                <p><?php esc_html_e('Bu kod otomatik olarak tüm sayfalara eklenmektedir:', 'veribenim'); ?></p>
                 <code style="display:block;padding:12px;background:#f0f0f1;border-left:4px solid #2271b1;">
                     <?php
                     $frontend = new Veribenim_Frontend();
@@ -242,11 +244,15 @@ class Veribenim_Admin
         $token = get_option('veribenim_token', '');
         if (!empty($token)) return;
 
-        echo '<div class="notice notice-warning is-dismissible">';
-        echo '<p>' . sprintf(
-            __('<strong>Veribenim:</strong> Token girilmemiş. <a href="%s">Ayarları yapılandırın</a>.', 'veribenim'),
-            admin_url('options-general.php?page=veribenim')
-        ) . '</p>';
-        echo '</div>';
+        echo '<div class="notice notice-warning is-dismissible"><p>';
+        printf(
+            /* translators: %s: Veribenim ayarlar sayfasının URL'i */
+            wp_kses(
+                __('<strong>Veribenim:</strong> Token girilmemiş. <a href="%s">Ayarları yapılandırın</a>.', 'veribenim'),
+                ['strong' => [], 'a' => ['href' => []]]
+            ),
+            esc_url(admin_url('options-general.php?page=veribenim'))
+        );
+        echo '</p></div>';
     }
 }
