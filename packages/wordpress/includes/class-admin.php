@@ -244,13 +244,12 @@ class Veribenim_Admin
         $token = get_option('veribenim_token', '');
         if (!empty($token)) return;
 
+        /* translators: %s: URL of the Veribenim settings page */
+        $message = __('<strong>Veribenim:</strong> Token girilmemiş. <a href="%s">Ayarları yapılandırın</a>.', 'veribenim');
+
         echo '<div class="notice notice-warning is-dismissible"><p>';
         printf(
-            /* translators: %s: Veribenim ayarlar sayfasının URL'i */
-            wp_kses(
-                __('<strong>Veribenim:</strong> Token girilmemiş. <a href="%s">Ayarları yapılandırın</a>.', 'veribenim'),
-                ['strong' => [], 'a' => ['href' => []]]
-            ),
+            wp_kses($message, ['strong' => [], 'a' => ['href' => []]]),
             esc_url(admin_url('options-general.php?page=veribenim'))
         );
         echo '</p></div>';
