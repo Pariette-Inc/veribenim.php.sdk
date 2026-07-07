@@ -266,44 +266,56 @@ class Veribenim_Plugin
             ? esc_js($rawRedirect)
             : '';
 
-        // Heredoc içinde ternary interpolation geçersiz — snippet önceden hesaplanır.
         $redirectJs = $redirectUrl !== ''
             ? "setTimeout(function(){window.location.href='" . $redirectUrl . "';},2000);"
             : '';
 
-        return <<<JS
-<script>
-(function(){
-  var form = document.getElementById('{$formId}');
-  if(!form || form.dataset.vbBound) return;
-  form.dataset.vbBound = '1';
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    var btn = form.querySelector('[type=submit]');
-    if(btn) btn.disabled = true;
-    var fd = new FormData(form);
-    var data = {};
-    fd.forEach(function(v,k){ if(k.endsWith('[]')){var rk=k.slice(0,-2);data[rk]=data[rk]||[];data[rk].push(v);}else{data[k]=v;}});
-    fetch('{$formAction}', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify(data)
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var t = res.success_title || '{$successTitle}';
-      var m = res.success_message || '{$successMessage}';
-      form.innerHTML = '<div class="vb-success" style="text-align:center;padding:32px"><div style="font-size:2rem;margin-bottom:12px">✅</div><div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">'+t+'</div><div style="color:#6b7280">'+m+'</div><div class="vb-badge" style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:20px;font-size:0.7rem;color:#9ca3af"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> VeriBenim ile kişisel verileriniz koruma altında</div></div>';
-      {$redirectJs}
-    })
-    .catch(function(){
-      if(btn) btn.disabled = false;
-      alert('Form gönderilemedi. Lütfen tekrar deneyin.');
-    });
-  });
-})();
-</script>
-JS;
+        // WP.org Plugin Check heredoc sözdizimini yasaklıyor; satır dizisi + implode kullanılır.
+        // PHP tek tırnaklı string: çift tırnaklar harfî, JS tek tırnakları \' ile kaçırılır.
+        $successHtml = '<div class="vb-success" style="text-align:center;padding:32px">'
+            . '<div style="font-size:2rem;margin-bottom:12px">✅</div>'
+            . '<div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">\'+t+\'</div>'
+            . '<div style="color:#6b7280">\'+m+\'</div>'
+            . '<div class="vb-badge" style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:20px;font-size:0.7rem;color:#9ca3af">'
+            . '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+            . '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+            . ' VeriBenim ile kişisel verileriniz koruma altında</div></div>';
+
+        $lines = [
+            '<script>',
+            '(function(){',
+            "  var form = document.getElementById('" . $formId . "');",
+            '  if(!form || form.dataset.vbBound) return;',
+            "  form.dataset.vbBound = '1';",
+            "  form.addEventListener('submit', function(e){",
+            '    e.preventDefault();',
+            "    var btn = form.querySelector('[type=submit]');",
+            '    if(btn) btn.disabled = true;',
+            '    var fd = new FormData(form);',
+            '    var data = {};',
+            "    fd.forEach(function(v,k){ if(k.endsWith('[]')){var rk=k.slice(0,-2);data[rk]=data[rk]||[];data[rk].push(v);}else{data[k]=v;}});",
+            "    fetch('" . $formAction . "', {",
+            "      method: 'POST',",
+            "      headers: {'Content-Type':'application/json','Accept':'application/json'},",
+            '      body: JSON.stringify(data)',
+            '    })',
+            '    .then(function(r){ return r.json(); })',
+            '    .then(function(res){',
+            "      var t = res.success_title || '" . $successTitle . "';",
+            "      var m = res.success_message || '" . $successMessage . "';",
+            "      form.innerHTML = '" . $successHtml . "';",
+            '      ' . $redirectJs,
+            '    })',
+            '    .catch(function(){',
+            '      if(btn) btn.disabled = false;',
+            "      alert('Form gönderilemedi. Lütfen tekrar deneyin.');",
+            '    });',
+            '  });',
+            '})();',
+            '</script>',
+        ];
+
+        return implode("\n", $lines);
     }
 
 }
