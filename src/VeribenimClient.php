@@ -57,6 +57,15 @@ class VeribenimClient
         return $this->post("/api/consents/{$this->config->token}/log", $data) !== null;
     }
 
+    /**
+     * Ziyaretçinin rızasını geri çeker (KVKK Md. 11/1-e, GDPR Md. 7/3).
+     * logConsent('withdraw', ...) için kısayol.
+     */
+    public function withdrawConsent(?string $sessionId = null): bool
+    {
+        return $this->logConsent('withdraw', null, $sessionId);
+    }
+
     // -------------------------------------------------------------------------
     // Ziyaretçi tercihleri
     // GET/POST /api/preferences/{token}
@@ -371,6 +380,56 @@ class VeribenimClient
             throw new \InvalidArgumentException('[Veribenim] collectAnalytics: "sid" ve "url" zorunludur');
         }
         return $this->postBeacon("/api/v/{$this->config->token}/e", $payload);
+    }
+
+    // -------------------------------------------------------------------------
+    // Özel Olay Takibi (Tracked Events)
+    // POST /api/v/{token}/ce
+    // -------------------------------------------------------------------------
+
+    /**
+     * Konsolda tanımlı bir özel olayın (tracked event) tetiklenmesini kaydeder.
+     * Olay tanımları konsoldan yönetilir; $eventId oradaki sayısal ID'dir.
+     *
+     * @param int    $eventId    Konsoldaki olay tanımının ID'si
+     * @param string $sessionId  Ziyaretçi session UUID (max 36)
+     * @param array  $opts       Opsiyonel: 'vid' (visitor hash, max 64),
+     *                           'url' (max 2048), 'txt' (element metni, max 255)
+     * @return bool  2xx/204 ise true
+     */
+    public function trackEvent(int $eventId, string $sessionId, array $opts = []): bool
+    {
+        if ($eventId <= 0 || $sessionId === '') {
+            throw new \InvalidArgumentException('[Veribenim] trackEvent: "eventId" ve "sessionId" zorunludur');
+        }
+
+        $payload = [
+            'eid' => $eventId,
+            'sid' => $sessionId,
+        ];
+        foreach (['vid', 'url', 'txt'] as $key) {
+            if (!empty($opts[$key])) {
+                $payload[$key] = $opts[$key];
+            }
+        }
+
+        return $this->postBeacon("/api/v/{$this->config->token}/ce", $payload);
+    }
+
+    // -------------------------------------------------------------------------
+    // IAB TCF v2.2 Slim Vendor Listesi
+    // GET /api/public/vendors/{token}
+    // -------------------------------------------------------------------------
+
+    /**
+     * Site için aktif IAB TCF v2.2 slim vendor listesini döner
+     * (banner'ın TCF modu ve şeffaflık katmanı için).
+     *
+     * @return array|null  ['status'=>bool,'data'=>['gvl_version'=>int,'purposes_meta'=>?,'vendors'=>[...]]] veya null
+     */
+    public function getVendors(): ?array
+    {
+        return $this->get("/api/public/vendors/{$this->config->token}");
     }
 
     // -------------------------------------------------------------------------

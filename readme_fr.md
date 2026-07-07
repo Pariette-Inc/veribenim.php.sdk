@@ -387,13 +387,16 @@ Composer
 ### Configuration Production
 
 ```php
-$client = new VeribenimClient(
+use Veribenim\VeribenimClient;
+use Veribenim\VeribenimConfig;
+
+$client = new VeribenimClient(new VeribenimConfig(
     token: getenv('VERIBENIM_TOKEN'),
+    domain: 'votresite.fr',
     lang: 'fr',
-    debug: false,
     timeout: 10,
-    retry: 3
-);
+    debug: false,
+));
 ```
 
 ---

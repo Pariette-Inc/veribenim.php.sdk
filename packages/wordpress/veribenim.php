@@ -3,7 +3,7 @@
  * Plugin Name:       Veribenim KVKK & GDPR Çerez Yönetimi
  * Plugin URI:        https://veribenim.com
  * Description:       KVKK ve GDPR uyumlu çerez onay banner'ı. Veribenim hesabınızla bağlayın, çerez yönetimini otomatikleştirin.
- * Version:           0.3.0
+ * Version:           0.4.0
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            Pariette
@@ -20,7 +20,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('VERIBENIM_VERSION', '0.3.0');
+define('VERIBENIM_VERSION', '0.4.0');
 define('VERIBENIM_PLUGIN_FILE', __FILE__);
 define('VERIBENIM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VERIBENIM_PLUGIN_URL', plugin_dir_url(__FILE__));

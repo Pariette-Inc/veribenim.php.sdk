@@ -385,6 +385,74 @@ class VeribenimClientTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // withdrawConsent
+    // -------------------------------------------------------------------------
+
+    public function test_withdraw_consent_logs_withdraw_action(): void
+    {
+        $this->client->queuedResponses[] = ['status' => true];
+
+        $this->assertTrue($this->client->withdrawConsent('sess-1'));
+
+        $request = $this->client->lastRequest();
+        $this->assertSame('/api/consents/' . self::TOKEN . '/log', $request['path']);
+        $this->assertSame('withdraw', $request['body']['action']);
+        $this->assertSame('sess-1', $request['body']['session_id']);
+        $this->assertArrayNotHasKey('consents', $request['body']);
+    }
+
+    // -------------------------------------------------------------------------
+    // trackEvent
+    // -------------------------------------------------------------------------
+
+    public function test_track_event_requires_positive_event_id(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->client->trackEvent(0, 'sess-1');
+    }
+
+    public function test_track_event_requires_session_id(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->client->trackEvent(7, '');
+    }
+
+    public function test_track_event_posts_beacon_with_optional_fields(): void
+    {
+        $this->assertTrue($this->client->trackEvent(7, 'sess-1', [
+            'txt' => 'Satın Al',
+            'url' => 'https://claude.com/urun',
+        ]));
+
+        $request = $this->client->lastRequest();
+        $this->assertSame('POST(beacon)', $request['method']);
+        $this->assertSame('/api/v/' . self::TOKEN . '/ce', $request['path']);
+        $this->assertSame(7, $request['body']['eid']);
+        $this->assertSame('sess-1', $request['body']['sid']);
+        $this->assertSame('Satın Al', $request['body']['txt']);
+        $this->assertSame('https://claude.com/urun', $request['body']['url']);
+        $this->assertArrayNotHasKey('vid', $request['body']);
+    }
+
+    // -------------------------------------------------------------------------
+    // getVendors
+    // -------------------------------------------------------------------------
+
+    public function test_get_vendors_calls_public_endpoint(): void
+    {
+        $this->client->queuedResponses[] = ['status' => true, 'data' => ['gvl_version' => 42, 'vendors' => []]];
+
+        $result = $this->client->getVendors();
+
+        $request = $this->client->lastRequest();
+        $this->assertSame('GET', $request['method']);
+        $this->assertSame('/api/public/vendors/' . self::TOKEN, $request['path']);
+        $this->assertSame(42, $result['data']['gvl_version']);
+    }
+
+    // -------------------------------------------------------------------------
     // scanCookies / verifyDomain
     // -------------------------------------------------------------------------
 

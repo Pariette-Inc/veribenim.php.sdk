@@ -255,6 +255,16 @@ $client->logImpression();          // Sayfa ziyareti
 $client->logConsent(...);          // Manuel rıza
 $client->withdrawConsent(...);     // Rızayı geri çek (KVKK Md.11/1-e)
 $client->submitDsar(...);          // DSAR isteği
+$client->getFormSchema(...);       // Form şeması (çoklu dil)
+$client->submitForm(...);          // Form gönderimi
+$client->renderFormHtml(...);      // Sunucu tarafı form render
+$client->collectAnalytics(...);    // Web analytics hit
+$client->trackEvent(...);          // Özel olay (tracked event) tetikleme
+$client->getVendors();             // IAB TCF v2.2 vendor listesi
+$client->scanCookies(...);         // Çerez/tracker taraması
+$client->verifyDomain(...);        // Domain doğrulama
+$client->scriptTag();              // Banner script tag'i
+$client->impressionPixelUrl(...);  // 1x1 pixel fallback URL
 ```
 
 ### Çerez Rızası Takibi
@@ -580,13 +590,16 @@ Composer
 ### Üretim Konfigürasyonu
 
 ```php
-$client = new VeribenimClient(
+use Veribenim\VeribenimClient;
+use Veribenim\VeribenimConfig;
+
+$client = new VeribenimClient(new VeribenimConfig(
     token: getenv('VERIBENIM_TOKEN'),
+    domain: 'siteniz.com',
     lang: 'tr',
+    timeout: 10,   // HTTP timeout (saniye)
     debug: false,  // Production'da MUTLAKA false
-    timeout: 10,   // Timeout süresi (saniye)
-    retry: 3       // Tekrar deneme sayısı
-);
+));
 ```
 
 ---

@@ -389,13 +389,16 @@ Composer
 ### تكوين الإنتاج
 
 ```php
-$client = new VeribenimClient(
+use Veribenim\VeribenimClient;
+use Veribenim\VeribenimConfig;
+
+$client = new VeribenimClient(new VeribenimConfig(
     token: getenv('VERIBENIM_TOKEN'),
+    domain: 'yoursite.com',
     lang: 'ar',
-    debug: false,
     timeout: 10,
-    retry: 3
-);
+    debug: false,
+));
 ```
 
 ---

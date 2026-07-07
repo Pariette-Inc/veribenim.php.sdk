@@ -37,8 +37,6 @@ class Veribenim_Plugin
             load_plugin_textdomain('veribenim', false, dirname(plugin_basename(VERIBENIM_PLUGIN_FILE)) . '/languages');
         });
 
-        // REST API endpoint (opsiyonel — JS bundle ile doğrudan iletişim için)
-        add_action('rest_api_init', [$this, 'register_rest_routes']);
     }
 
     /**
@@ -308,8 +306,4 @@ class Veribenim_Plugin
 JS;
     }
 
-    public function register_rest_routes(): void
-    {
-        // Gelecek sürüm için placeholder
-    }
 }

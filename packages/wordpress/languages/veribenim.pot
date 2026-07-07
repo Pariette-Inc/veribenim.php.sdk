@@ -1,0 +1,111 @@
+# Copyright (C) 2026 Pariette
+# This file is distributed under the MIT license.
+msgid ""
+msgstr ""
+"Project-Id-Version: Veribenim KVKK & GDPR Çerez Yönetimi 0.4.0\n"
+"Report-Msgid-Bugs-To: https://veribenim.com\n"
+"POT-Creation-Date: 2026-07-07 12:00+0300\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"X-Generator: manual\n"
+"X-Domain: veribenim\n"
+
+#: includes/class-plugin.php:135
+msgid "Gönder"
+msgstr ""
+
+#: includes/class-plugin.php:156
+msgid "VeriBenim ile kişisel verileriniz koruma altında"
+msgstr ""
+
+#: includes/class-plugin.php:194
+msgid "Seçiniz..."
+msgstr ""
+
+#: includes/class-plugin.php:261
+msgid "Teşekkürler!"
+msgstr ""
+
+#: includes/class-plugin.php:262
+msgid "Formunuz başarıyla gönderildi."
+msgstr ""
+
+#: includes/class-admin.php:12
+msgid "Veribenim Ayarları"
+msgstr ""
+
+#: includes/class-admin.php:49
+msgid "Bağlantı Ayarları"
+msgstr ""
+
+#: includes/class-admin.php:56
+msgid "Site Token"
+msgstr ""
+
+#: includes/class-admin.php:64
+msgid "Dil"
+msgstr ""
+
+#: includes/class-admin.php:76
+msgid "Veribenim panelinden > Siteniz > Entegrasyon bölümünden alın."
+msgstr ""
+
+#: includes/class-admin.php:96
+msgid "Geçersiz token formatı. Token alfanümerik, 20-128 karakter arası olmalıdır."
+msgstr ""
+
+#: includes/class-admin.php:116
+msgid "Yetersiz yetki."
+msgstr ""
+
+#: includes/class-admin.php:123
+msgid "Token girilmemiş."
+msgstr ""
+
+#: includes/class-admin.php:138
+msgid "Bağlantı başarılı."
+msgstr ""
+
+#: includes/class-admin.php:140
+msgid "Bağlantı hatası."
+msgstr ""
+
+#: includes/class-admin.php:168
+msgid "Veribenim aktif ve çalışıyor."
+msgstr ""
+
+#: includes/class-admin.php:176
+msgid "Ayarları Kaydet"
+msgstr ""
+
+#: includes/class-admin.php:183
+msgid "Bağlantıyı Test Et"
+msgstr ""
+
+#: includes/class-admin.php:192
+msgid "Test ediliyor..."
+msgstr ""
+
+#: includes/class-admin.php:207
+msgid "Hata oluştu."
+msgstr ""
+
+#: includes/class-admin.php:213
+msgid "İstek gönderilemedi."
+msgstr ""
+
+#: includes/class-admin.php:220
+msgid "Entegrasyon Kodu"
+msgstr ""
+
+#: includes/class-admin.php:222
+msgid "Bu kod otomatik olarak tüm sayfalara eklenmektedir:"
+msgstr ""
+
+#: includes/class-admin.php:247
+msgid "<strong>Veribenim:</strong> Token girilmemiş. <a href=\"%s\">Ayarları yapılandırın</a>."
+msgstr ""

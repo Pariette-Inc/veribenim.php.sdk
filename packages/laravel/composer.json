@@ -7,7 +7,7 @@
   "type": "library",
   "require": {
     "php": "^8.1",
-    "veribenim/php-sdk": "^0.1",
+    "veribenim/php-sdk": "^0.4",
     "illuminate/support": "^10.0|^11.0|^12.0"
   },
   "require-dev": {
