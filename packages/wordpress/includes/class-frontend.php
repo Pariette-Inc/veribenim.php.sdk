@@ -46,10 +46,11 @@ class Veribenim_Frontend
     }
 
     /**
-     * Bundle URL'ini domain'den türetir.
+     * Bundle URL'ini domain'den türetir. Frontend enjeksiyonu ve admin
+     * "Entegrasyon Kodu" gösterimi için TEK kaynak.
      * Öncelik: veribenim_script_url (manuel override) > veribenim_domain > site URL
      */
-    private function resolve_bundle_url(): string
+    public function resolve_bundle_url(): string
     {
         // Manuel override varsa kullan
         $custom_url = get_option('veribenim_script_url', '');

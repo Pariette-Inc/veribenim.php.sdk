@@ -136,11 +136,29 @@ class Veribenim_Admin
         }
 
         $code = wp_remote_retrieve_response_code($response);
-        if ($code === 200) {
-            wp_send_json_success(['message' => __('Bağlantı başarılı.', 'veribenim'), 'code' => $code]);
-        } else {
-            wp_send_json_error(['message' => __('Bağlantı hatası.', 'veribenim'), 'code' => $code]);
+        $body = json_decode((string) wp_remote_retrieve_body($response), true);
+
+        // verify ucu found:false durumunda da 200 döner — gövdeyi kontrol et.
+        if ($code === 200 && is_array($body) && !empty($body['found'])) {
+            // Kanonik domain'i Veribenim'den al ve pinle → bundle URL'i her zaman doğru.
+            if (!empty($body['domain'])) {
+                update_option('veribenim_domain', sanitize_text_field((string) $body['domain']));
+            }
+            wp_send_json_success([
+                'message'    => __('Bağlantı başarılı.', 'veribenim'),
+                'code'       => $code,
+                'bundle_url' => (new Veribenim_Frontend())->resolve_bundle_url(),
+            ]);
         }
+
+        if ($code === 200 && is_array($body) && isset($body['found']) && $body['found'] === false) {
+            wp_send_json_error([
+                'message' => __('Bu domain Veribenim hesabınızda kayıtlı değil. Panelde bu siteyi eklediğinizden emin olun.', 'veribenim'),
+                'code'    => $code,
+            ]);
+        }
+
+        wp_send_json_error(['message' => __('Bağlantı hatası.', 'veribenim'), 'code' => $code]);
     }
 
     public function render_lang_field(): void
@@ -223,12 +241,7 @@ class Veribenim_Admin
             <?php if (!empty($token)): ?>
                 <p><?php esc_html_e('Bu kod otomatik olarak tüm sayfalara eklenmektedir:', 'veribenim'); ?></p>
                 <code style="display:block;padding:12px;background:#f0f0f1;border-left:4px solid #2271b1;">
-                    <?php
-                    $frontend = new Veribenim_Frontend();
-                    $domain = get_option('veribenim_domain', home_url());
-                    $filename = Veribenim_Frontend::clean_domain_for_filename($domain);
-                    $bundle_url = "https://bundles.veribenim.com/{$filename}.js";
-                    ?>
+                    <?php $bundle_url = (new Veribenim_Frontend())->resolve_bundle_url(); ?>
                     &lt;script src="<?php echo esc_html($bundle_url); ?>" async defer&gt;&lt;/script&gt;
                 </code>
             <?php endif; ?>

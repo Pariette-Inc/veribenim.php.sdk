@@ -4,7 +4,7 @@ Tags: cookie-consent, gdpr, privacy, consent, cookie-banner
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -67,6 +67,11 @@ When the plugin is deleted, all Veribenim settings in WordPress (including the t
 
 == Changelog ==
 
+= 0.4.1 =
+* Fix: the admin "Integration code" box now shows the real domain-based bundle URL instead of the "bundle.js" placeholder.
+* The connection test now verifies the site is registered (not just HTTP 200) and pins the canonical domain returned by Veribenim, so the bundle URL is always correct.
+* Bundle URL resolution unified into a single source used by both the injected script and the admin display.
+
 = 0.4.0 =
 * WordPress.org submission readiness: external service disclosure, uninstall cleanup, translation template (.pot).
 * Banner script now loaded through wp_enqueue_script.
@@ -86,6 +91,9 @@ When the plugin is deleted, all Veribenim settings in WordPress (including the t
 * Initial release.
 
 == Upgrade Notice ==
+
+= 0.4.1 =
+Fixes the integration-code display and pins the correct bundle URL from your Veribenim account. Recommended for all users.
 
 = 0.4.0 =
 WordPress.org compliance release. Deleting the plugin now removes all settings; note down your token before deleting.
