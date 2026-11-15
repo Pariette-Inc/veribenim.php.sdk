@@ -31,6 +31,21 @@ class ServiceProviderTest extends TestCase
         $this->assertSame($config, $this->app->make(VeribenimConfig::class));
     }
 
+    public function test_config_endpoints_default_to_todays_hosts(): void
+    {
+        $config = $this->app->make(VeribenimConfig::class);
+
+        $this->assertSame('https://live.veribenim.com', $config->apiUrl);
+        $this->assertSame('https://bundles.veribenim.com', $config->bundleBaseUrl);
+        $this->assertSame('https://veribenim.com', $config->webUrl);
+    }
+
+    public function test_consent_proxy_routes_are_off_by_default(): void
+    {
+        $this->assertNull($this->app['router']->getRoutes()->getByName('veribenim.consent-proxy.consent'));
+        $this->post('/_vb/abcdefghijklmnop1234567890ABCDEF/c')->assertStatus(404);
+    }
+
     public function test_client_singleton_and_alias_resolve_to_same_instance(): void
     {
         $client = $this->app->make(VeribenimClient::class);

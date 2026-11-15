@@ -144,4 +144,52 @@ class VeribenimClientHttpTest extends TestCase
 
         $this->assertTrue($ok);
     }
+
+    // -------------------------------------------------------------------------
+    // CurlProxyTransport — gerçek HTTP ile rıza proxy'si
+    // -------------------------------------------------------------------------
+
+    public function test_consent_proxy_over_real_http_carries_cookie_and_hides_key(): void
+    {
+        $token = 'ProxyHttpToken1234567890abcdefgh';
+        $key = 'vbpk_httpSECRETkey1234567890abcdefgh';
+        $proxy = new \Veribenim\Proxy\ConsentProxy($token, $key, self::$baseUrl);
+        $cookie = \Veribenim\Proxy\ConsentProxy::cookieName($token);
+
+        $response = $proxy->handle(new \Veribenim\Proxy\ConsentProxyRequest(
+            method: 'POST',
+            path: '/_vb/' . $token . '/c',
+            headers: [
+                'Content-Type'    => 'text/plain',
+                'Cookie'          => 'PHPSESSID=s3cr3t; ' . $cookie . '=old',
+                'X-Forwarded-For' => '6.6.6.6',
+            ],
+            body: '{"action":"accept_all"}',
+            clientIp: '203.0.113.77',
+        ));
+
+        $this->assertSame(200, $response->status);
+        $this->assertSame([$cookie . '=eyJ2IjoxfQ; Path=/; Max-Age=600; SameSite=Lax'], $response->headerValues('Set-Cookie'));
+        $this->assertSame([], $response->headerValues('X-Upstream-Secret'));
+
+        $echo = json_decode($response->body, true);
+        // Upstream anahtarı aldı, ama yansıttığı değer istemciye maskeli döner.
+        $this->assertSame('[redacted]', $echo['key']);
+        $this->assertStringNotContainsString($key, $response->body);
+        $this->assertSame('203.0.113.77', $echo['client_ip']);
+        $this->assertSame($cookie . '=old', $echo['cookie']);
+        $this->assertNull($echo['xff']);
+        $this->assertSame('{"action":"accept_all"}', $echo['body']);
+    }
+
+    public function test_consent_proxy_does_not_follow_upstream_redirect(): void
+    {
+        $token = 'ProxyRedirToken1234567890abcdefg';
+        $proxy = new \Veribenim\Proxy\ConsentProxy($token, 'vbpk_key1234567890abcdef', self::$baseUrl);
+
+        $response = $proxy->handle(new \Veribenim\Proxy\ConsentProxyRequest('POST', '/_vb/' . $token . '/c', [], [], '{}', '1.2.3.4'));
+
+        $this->assertSame(502, $response->status);
+        $this->assertSame([], $response->headerValues('Location'));
+    }
 }

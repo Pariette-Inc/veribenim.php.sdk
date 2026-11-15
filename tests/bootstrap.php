@@ -25,5 +25,6 @@ if (! defined('ABSPATH')) {
 
 require __DIR__ . '/../packages/wordpress/tests/Support/wp-stubs.php';
 require __DIR__ . '/../packages/wordpress/includes/class-frontend.php';
+require __DIR__ . '/../packages/wordpress/includes/class-consent-proxy.php';
 require __DIR__ . '/../packages/wordpress/includes/class-admin.php';
 require __DIR__ . '/../packages/wordpress/includes/class-plugin.php';

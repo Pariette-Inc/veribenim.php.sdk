@@ -36,8 +36,16 @@ class VeribenimWpTestState
     /** @var array<int, array{handle:string, src:string, deps:array, ver:mixed, in_footer:bool}> */
     public static array $enqueuedScripts = [];
 
+    /** @var array<string, callable> apply_filters için test filtreleri */
+    public static array $filters = [];
+
+    /** wp_remote_request'in döneceği yanıt (array ya da WP_Error) */
+    public static mixed $remoteRequestResponse = null;
+
     public static function reset(): void
     {
+        self::$filters         = [];
+        self::$remoteRequestResponse = null;
         self::$options         = [];
         self::$isAdmin         = false;
         self::$currentUserCan  = true;
@@ -292,6 +300,50 @@ if (! function_exists('wp_remote_retrieve_body')) {
         }
 
         return $response['body'] ?? '';
+    }
+}
+
+if (! function_exists('wp_remote_request')) {
+    function wp_remote_request($url, array $args = [])
+    {
+        VeribenimWpTestState::$remoteRequests[] = ['url' => $url, 'args' => $args];
+
+        return VeribenimWpTestState::$remoteRequestResponse
+            ?? new WP_Error('http_request_failed', 'Yanıt tanımlanmadı');
+    }
+}
+
+if (! function_exists('wp_remote_retrieve_headers')) {
+    function wp_remote_retrieve_headers($response)
+    {
+        if ($response instanceof WP_Error || ! is_array($response)) {
+            return [];
+        }
+
+        return $response['headers'] ?? [];
+    }
+}
+
+if (! function_exists('apply_filters')) {
+    function apply_filters($hook, $value, ...$args)
+    {
+        $filter = VeribenimWpTestState::$filters[$hook] ?? null;
+
+        return $filter ? $filter($value, ...$args) : $value;
+    }
+}
+
+if (! function_exists('wp_json_encode')) {
+    function wp_json_encode($data, $options = 0, $depth = 512)
+    {
+        return json_encode($data, $options, $depth);
+    }
+}
+
+if (! function_exists('wp_unslash')) {
+    function wp_unslash($value)
+    {
+        return is_string($value) ? stripslashes($value) : $value;
     }
 }
 

@@ -44,6 +44,8 @@ class PluginTest extends TestCase
         $this->assertArrayHasKey('wp_enqueue_scripts', VeribenimWpTestState::$actions);
         $this->assertArrayHasKey('script_loader_tag', VeribenimWpTestState::$actions);
         $this->assertArrayHasKey('veribenim_form', VeribenimWpTestState::$shortcodes);
+        // Rıza proxy'si init'te en erken öncelikle kayıtlı
+        $this->assertSame(0, VeribenimWpTestState::$actions['init'][0]['priority'] ?? null);
         // is_admin=false → admin hook'ları kaydedilmez
         $this->assertArrayNotHasKey('admin_menu', VeribenimWpTestState::$actions);
     }
@@ -94,6 +96,10 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('data-vb-form="iletisim"', $output);
         $this->assertStringContainsString('data-vb-token="' . self::TOKEN . '"', $output);
         $this->assertStringContainsString('veribenim.renderForm("iletisim","#vb-form-iletisim")', $output);
+        // Bundle olayı window'a atar ve ready bayrağı kurar; document dinlemek olayı kaçırırdı.
+        $this->assertStringContainsString('window.addEventListener("VeribenimReady"', $output);
+        $this->assertStringContainsString('veribenim.ready', $output);
+        $this->assertStringNotContainsString('document.addEventListener("VeribenimReady"', $output);
         // JS modunda API'ye gidilmez
         $this->assertSame([], VeribenimWpTestState::$remoteRequests);
     }

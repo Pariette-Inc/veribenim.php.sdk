@@ -79,6 +79,31 @@ class FrontendTest extends TestCase
         $this->assertFalse($script['in_footer'] ?? null);
     }
 
+    public function test_bundle_base_url_option_and_filter_for_on_prem(): void
+    {
+        VeribenimWpTestState::$options['veribenim_domain'] = 'claude.com';
+        $frontend = new Veribenim_Frontend();
+
+        $this->assertSame('https://bundles.veribenim.com/claudecom.js', $frontend->resolve_bundle_url());
+
+        VeribenimWpTestState::$options['veribenim_bundle_base_url'] = 'https://cdn.kurum.local/b/';
+        $this->assertSame('https://cdn.kurum.local/b/claudecom.js', $frontend->resolve_bundle_url());
+
+        VeribenimWpTestState::$filters['veribenim_bundle_base_url'] = fn () => 'https://filtre.kurum.local';
+        $this->assertSame('https://filtre.kurum.local/claudecom.js', $frontend->resolve_bundle_url());
+    }
+
+    public function test_api_url_defaults_and_filter(): void
+    {
+        $this->assertSame('https://live.veribenim.com', Veribenim_Frontend::api_url());
+
+        VeribenimWpTestState::$options['veribenim_api_url'] = '';
+        $this->assertSame('https://live.veribenim.com', Veribenim_Frontend::api_url());
+
+        VeribenimWpTestState::$filters['veribenim_api_url'] = fn () => 'https://api.kurum.local/';
+        $this->assertSame('https://api.kurum.local', Veribenim_Frontend::api_url());
+    }
+
     public function test_enqueue_falls_back_to_home_url(): void
     {
         VeribenimWpTestState::$options['veribenim_token'] = str_repeat('a', 32);

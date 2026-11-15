@@ -33,6 +33,7 @@ if (file_exists(VERIBENIM_PLUGIN_DIR . 'vendor/autoload.php')) {
 require_once VERIBENIM_PLUGIN_DIR . 'includes/class-plugin.php';
 require_once VERIBENIM_PLUGIN_DIR . 'includes/class-admin.php';
 require_once VERIBENIM_PLUGIN_DIR . 'includes/class-frontend.php';
+require_once VERIBENIM_PLUGIN_DIR . 'includes/class-consent-proxy.php';
 
 /**
  * Plugin başlatma
@@ -51,7 +52,7 @@ register_activation_hook(__FILE__, function () {
     add_option('veribenim_token', '');
     add_option('veribenim_domain', '');
     add_option('veribenim_lang', 'tr');
-    add_option('veribenim_api_url', 'https://live.veribenim.com');
+    add_option('veribenim_api_url', Veribenim_Frontend::DEFAULT_API_URL);
     add_option('veribenim_script_url', '');
 });
 

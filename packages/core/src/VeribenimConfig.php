@@ -6,6 +6,14 @@ namespace Veribenim;
 
 class VeribenimConfig
 {
+    /**
+     * Varsayılan adresler — bugünkü bulut kurulumu. Kurum içi (On-Prem)
+     * kurulumda kurucu parametreleriyle değiştirilir; tek kaynak burasıdır.
+     */
+    public const DEFAULT_API_URL = 'https://live.veribenim.com';
+    public const DEFAULT_BUNDLE_BASE_URL = 'https://bundles.veribenim.com';
+    public const DEFAULT_WEB_URL = 'https://veribenim.com';
+
     public function __construct(
         /** Environment token — Veribenim panelinden alınır (32 karakter) */
         public readonly string $token,
@@ -17,10 +25,14 @@ class VeribenimConfig
         public readonly int $timeout = 5,
         /** Debug modu. Varsayılan: false */
         public readonly bool $debug = false,
-        /** @internal — Yalnızca ileri düzey kullanım */
-        public readonly string $apiUrl = 'https://live.veribenim.com',
+        /** API tabanı. Varsayılan: https://live.veribenim.com (On-Prem'de kendi adresiniz) */
+        public readonly string $apiUrl = self::DEFAULT_API_URL,
         /** @internal — Tam script URL override'ı. Belirtilmezse domain'den türetilir. */
         public readonly string $scriptUrl = '',
+        /** Bundle dosyalarının tabanı. Varsayılan: https://bundles.veribenim.com */
+        public readonly string $bundleBaseUrl = self::DEFAULT_BUNDLE_BASE_URL,
+        /** Panel / web sitesi adresi. Varsayılan: https://veribenim.com */
+        public readonly string $webUrl = self::DEFAULT_WEB_URL,
     ) {
         if (empty($token)) {
             throw new \InvalidArgumentException('[Veribenim] token boş olamaz');
@@ -50,7 +62,8 @@ class VeribenimConfig
         }
         if (!empty($this->domain)) {
             $filename = self::cleanDomainForFilename($this->domain);
-            return "https://bundles.veribenim.com/{$filename}.js";
+            $base = rtrim($this->bundleBaseUrl !== '' ? $this->bundleBaseUrl : self::DEFAULT_BUNDLE_BASE_URL, '/');
+            return "{$base}/{$filename}.js";
         }
         return '';
     }

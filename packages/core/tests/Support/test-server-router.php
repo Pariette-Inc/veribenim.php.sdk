@@ -15,6 +15,30 @@ if (preg_match('#^/api/v/[^/]+/e$#', parse_url($uri, PHP_URL_PATH) ?: '')) {
     exit;
 }
 
+// Rıza proxy upstream'i (/api/vp/{token}/c|ping) — CurlProxyTransport testleri
+if (preg_match('#^/api/vp/([^/]+)/(c|ping)$#', parse_url($uri, PHP_URL_PATH) ?: '', $m)) {
+    if (str_contains($m[1], 'Redir')) {
+        http_response_code(302);
+        header('Location: https://evil.example/');
+        exit;
+    }
+    http_response_code(200);
+    header('Content-Type: application/json');
+    header('Set-Cookie: vb_consent_' . substr(hash('sha256', 'vb-consent-cookie|' . $m[1]), 0, 8) . '=eyJ2IjoxfQ; Path=/; Max-Age=600; SameSite=Lax', false);
+    header('Set-Cookie: upstream_other=1; Path=/', false);
+    header('X-Upstream-Secret: 1');
+    echo json_encode([
+        'method'    => $_SERVER['REQUEST_METHOD'],
+        'query'     => $_SERVER['QUERY_STRING'] ?? '',
+        'key'       => $_SERVER['HTTP_X_VB_PROXY_KEY'] ?? null,
+        'client_ip' => $_SERVER['HTTP_X_VB_CLIENT_IP'] ?? null,
+        'cookie'    => $_SERVER['HTTP_COOKIE'] ?? null,
+        'xff'       => $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null,
+        'body'      => (string) file_get_contents('php://input'),
+    ]);
+    exit;
+}
+
 if (str_contains($uri, 'err404')) {
     http_response_code(404);
     header('Content-Type: application/json');

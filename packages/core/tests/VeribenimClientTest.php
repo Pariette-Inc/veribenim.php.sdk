@@ -83,15 +83,22 @@ class VeribenimClientTest extends TestCase
     // logConsent
     // -------------------------------------------------------------------------
 
-    public function test_log_consent_sends_action_only_when_no_preferences(): void
+    public function test_log_consent_sends_action_and_session_when_no_preferences(): void
     {
         $this->client->queuedResponses[] = ['ok' => true];
 
-        $this->assertTrue($this->client->logConsent('accept_all'));
+        $this->assertTrue($this->client->logConsent('accept_all', null, 'sess-1'));
 
         $request = $this->client->lastRequest();
         $this->assertSame('/api/consents/' . self::TOKEN . '/log', $request['path']);
-        $this->assertSame(['action' => 'accept_all'], $request['body']);
+        $this->assertSame(['action' => 'accept_all', 'session_id' => 'sess-1'], $request['body']);
+    }
+
+    public function test_log_consent_without_session_id_does_not_call_api(): void
+    {
+        // API: session_id => required (ConsentController::log) — istek 422 alırdı.
+        $this->assertFalse($this->client->logConsent('accept_all'));
+        $this->assertSame([], $this->client->requests);
     }
 
     public function test_log_consent_includes_consents_and_session_id(): void
@@ -134,6 +141,23 @@ class VeribenimClientTest extends TestCase
 
         $this->assertSame(
             '/api/preferences/' . self::TOKEN . '?session_id=' . urlencode('sess id/özel'),
+            $this->client->lastRequest()['path']
+        );
+    }
+
+    public function test_save_preferences_without_session_id_does_not_call_api(): void
+    {
+        $this->assertNull($this->client->savePreferences(['analytics' => true]));
+        $this->assertSame([], $this->client->requests);
+    }
+
+    public function test_get_consent_history_calls_history_endpoint(): void
+    {
+        $this->client->queuedResponses[] = ['status' => true, 'data' => []];
+
+        $this->assertSame(['status' => true, 'data' => []], $this->client->getConsentHistory('sess 1'));
+        $this->assertSame(
+            '/api/preferences/' . self::TOKEN . '/history?session_id=sess+1',
             $this->client->lastRequest()['path']
         );
     }
@@ -314,6 +338,30 @@ class VeribenimClientTest extends TestCase
         $this->assertStringContainsString('max="99"', $html);
     }
 
+    public function test_render_form_html_file_field_is_array_and_consent_is_checkbox(): void
+    {
+        $this->client->queuedResponses[] = [
+            'fields' => [
+                ['uuid' => 'u-file', 'type' => 'file', 'label' => 'Belge'],
+                [
+                    'uuid'     => 'u-ok',
+                    'type'     => 'consent',
+                    'label'    => 'Onay',
+                    'required' => true,
+                    'settings' => ['consent_text' => '{policy_title} metnini <b>okudum</b>', 'policy_title' => 'Aydınlatma'],
+                ],
+            ],
+        ];
+
+        $html = $this->client->renderFormHtml('belge');
+
+        // API dosya alanını dizi olarak doğrular (FormController::submit: 'array').
+        $this->assertStringContainsString('name="u-file[]"', $html);
+        $this->assertStringContainsString('<input type="checkbox" id="vb-u-ok" name="u-ok" value="1" required>', $html);
+        $this->assertStringContainsString('Aydınlatma metnini &lt;b&gt;okudum&lt;/b&gt;', $html);
+        $this->assertStringNotContainsString('checked', $html);
+    }
+
     // -------------------------------------------------------------------------
     // submitDsar
     // -------------------------------------------------------------------------
@@ -326,25 +374,49 @@ class VeribenimClientTest extends TestCase
         $this->client->submitDsar('silinme', 'Ahmet Yılmaz', 'ahmet@example.com');
     }
 
-    public function test_submit_dsar_posts_valid_request(): void
+    public function test_submit_dsar_posts_api_field_names(): void
     {
-        $this->client->submitDsar('erasure', 'Ahmet Yılmaz', 'ahmet@example.com', 'Verilerim silinsin');
+        $this->client->submitDsar('erasure', 'Ahmet Can Yılmaz', 'ahmet@example.com', 'Verilerim silinsin', '+90 555 000 00 00');
 
         $request = $this->client->lastRequest();
         $this->assertSame('/api/dsar/' . self::TOKEN, $request['path']);
+        // DsarController::store: first_name, last_name, email, phone, request_type, message
         $this->assertSame([
-            'request_type' => 'erasure',
-            'full_name'    => 'Ahmet Yılmaz',
+            'first_name'   => 'Ahmet Can',
+            'last_name'    => 'Yılmaz',
             'email'        => 'ahmet@example.com',
-            'description'  => 'Verilerim silinsin',
+            'request_type' => 'erasure',
+            'phone'        => '+90 555 000 00 00',
+            'message'      => 'Verilerim silinsin',
         ], $request['body']);
     }
 
-    public function test_submit_dsar_omits_empty_description(): void
+    public function test_submit_dsar_omits_empty_description_and_phone(): void
     {
-        $this->client->submitDsar('access', 'Ahmet', 'a@b.com');
+        $this->client->submitDsar('access', 'Ayşe Kaya', 'a@b.com');
 
-        $this->assertArrayNotHasKey('description', $this->client->lastRequest()['body']);
+        $body = $this->client->lastRequest()['body'];
+        $this->assertArrayNotHasKey('message', $body);
+        $this->assertArrayNotHasKey('phone', $body);
+        $this->assertArrayNotHasKey('full_name', $body);
+        $this->assertArrayNotHasKey('description', $body);
+    }
+
+    public function test_submit_dsar_maps_legacy_automated_type(): void
+    {
+        $this->client->submitDsar('automated', 'Ayşe Kaya', 'a@b.com');
+        $this->assertSame('automated_decision', $this->client->lastRequest()['body']['request_type']);
+
+        $this->client->submitDsar('automated_decision', 'Ayşe Kaya', 'a@b.com');
+        $this->assertSame('automated_decision', $this->client->lastRequest()['body']['request_type']);
+    }
+
+    public function test_submit_dsar_requires_first_and_last_name(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('ad ve soyad gerekli');
+
+        $this->client->submitDsar('access', 'Ahmet', 'a@b.com');
     }
 
     // -------------------------------------------------------------------------
@@ -388,17 +460,26 @@ class VeribenimClientTest extends TestCase
     // withdrawConsent
     // -------------------------------------------------------------------------
 
-    public function test_withdraw_consent_logs_withdraw_action(): void
+    public function test_withdraw_consent_uses_preference_center_withdraw_endpoint(): void
     {
         $this->client->queuedResponses[] = ['status' => true];
 
         $this->assertTrue($this->client->withdrawConsent('sess-1'));
 
         $request = $this->client->lastRequest();
-        $this->assertSame('/api/consents/' . self::TOKEN . '/log', $request['path']);
-        $this->assertSame('withdraw', $request['body']['action']);
-        $this->assertSame('sess-1', $request['body']['session_id']);
-        $this->assertArrayNotHasKey('consents', $request['body']);
+        $this->assertSame('POST', $request['method']);
+        $this->assertSame('/api/preferences/' . self::TOKEN . '/withdraw', $request['path']);
+        $this->assertSame(['session_id' => 'sess-1'], $request['body']);
+    }
+
+    public function test_withdraw_consent_false_when_api_reports_failure_or_no_session(): void
+    {
+        $this->client->queuedResponses[] = ['status' => false];
+        $this->assertFalse($this->client->withdrawConsent('sess-1'));
+
+        $count = count($this->client->requests);
+        $this->assertFalse($this->client->withdrawConsent());
+        $this->assertCount($count, $this->client->requests);
     }
 
     // -------------------------------------------------------------------------

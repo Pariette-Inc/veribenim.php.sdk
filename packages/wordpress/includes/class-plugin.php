@@ -33,6 +33,10 @@ class Veribenim_Plugin
         // Form Generator shortcode: [veribenim_form slug="iletisim-formu"]
         add_shortcode('veribenim_form', [$this, 'render_form_shortcode']);
 
+        // Birinci taraf rıza proxy'si: /_vb/{token}/c|ping → Veribenim /api/vp/*.
+        // Tema/eklenti çıktısından ÖNCE yakalanır; kapalıysa hiçbir şey yapmaz.
+        add_action('init', [new Veribenim_Consent_Proxy(), 'maybe_handle'], 0);
+
     }
 
     /**
@@ -76,9 +80,12 @@ class Veribenim_Plugin
         if ($atts['mode'] === 'js') {
             $containerId = !empty($atts['id']) ? esc_attr($atts['id']) : 'vb-form-' . esc_attr($slug);
             $langOption = $lang ? sprintf(',{lang:"%s"}', esc_js($lang)) : '';
+            // Bundle `VeribenimReady`'i WINDOW üzerinde atar ve `veribenim.ready`
+            // bayrağını kurar. Eskiden document dinleniyordu (olay oraya ulaşmaz)
+            // ve bundle önce yüklendiyse olay zaten kaçırılmıştı → form hiç çizilmezdi.
             return sprintf(
                 '<div id="%s" class="%s" data-vb-form="%s" data-vb-token="%s"></div>' .
-                '<script>document.addEventListener("VeribenimReady",function(){if(window.veribenim&&veribenim.renderForm){veribenim.renderForm("%s","#%s"%s);}});</script>',
+                '<script>(function(){var r=function(){if(window.veribenim&&veribenim.renderForm){veribenim.renderForm("%s","#%s"%s);}};if(window.veribenim&&veribenim.ready){r();}else{window.addEventListener("VeribenimReady",r,{once:true});}})();</script>',
                 $containerId,
                 esc_attr($atts['class']),
                 esc_attr($slug),
@@ -90,7 +97,7 @@ class Veribenim_Plugin
         }
 
         // HTML modu: PHP ile sunucu taraflı render
-        $apiUrl = rtrim(get_option('veribenim_api_url', 'https://live.veribenim.com'), '/');
+        $apiUrl = Veribenim_Frontend::api_url();
 
         // Schema'yı Veribenim API'sinden çek
         $schemaUrl = $apiUrl . '/api/public/forms/' . rawurlencode($token) . '/' . rawurlencode($slug);

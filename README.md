@@ -23,6 +23,7 @@ Veribenim PHP SDK, **framework'ten bağımsız, saf PHP ile entegrasyonu sağlay
   - [Çerez Rızası Takibi](#çerez-rızası-takibi)
   - [DSAR İşlemleri](#dsar-işlemleri)
   - [Çerez Banner Entegrasyonu](#çerez-banner-entegrasyonu)
+- [Birinci Taraf Rıza Proxy'si ve On-Prem (Kasım 2026)](#birinci-taraf-rıza-proxysi-ve-on-prem-kasım-2026)
 - [Güvenlik Standartları](#güvenlik-standartları)
 - [Gereksinimler](#gereksinimler)
 - [Lisans](#lisans)
@@ -365,14 +366,18 @@ if ($client->getPreferences()['analytics']) {
 #### logConsent — Manuel Rıza Kaydı
 
 ```php
-$client->logConsent([
-    'categories' => ['analytics', 'marketing'],
-    'language' => 'tr',
-    'ip_address' => $_SERVER['REMOTE_ADDR'],
-    'user_agent' => $_SERVER['HTTP_USER_AGENT'],
-    'consent_timestamp' => date('c')
-]);
+// İmza: logConsent(string $action, ?array $preferences = null, ?string $sessionId = null): bool
+$client->logConsent('save_preferences', [
+    'strictly_necessary' => true,
+    'functional'         => true,
+    'analytics'          => false,
+    'marketing'          => false,
+], $sessionId);
 ```
+
+> `session_id` API'de zorunludur; verilmezse istek atılmaz ve `false` döner.
+> Bu uç (`/api/consents/{token}/log`) tarayıcı uçudur: Origin/Referer taşımayan
+> sunucu-sunucu çağrısını API 403 ile reddeder. Karar kaydını normalde bundle yapar.
 
 ### DSAR İşlemleri
 
@@ -383,23 +388,25 @@ GDPR Artikel 15-22 kapsamında tüm hakları yerine getir:
 ```php
 public function handleDataRequest() {
     $requestType = $_POST['request_type'];  // Validation yap!
-    $fullName = $_POST['full_name'];
+    $fullName = $_POST['full_name'];        // En az iki kelime: son kelime soyad sayılır
     $email = $_POST['email'];
     $description = $_POST['description'] ?? '';
     
     try {
+        // API'ye first_name, last_name, email, phone, request_type, message olarak gider.
         $response = $client->submitDsar(
             requestType: $requestType,
             fullName: $fullName,
             email: $email,
-            description: $description
+            description: $description,
+            phone: $_POST['phone'] ?? ''
         );
         
         // E-mail kullanıcıya gönder
         mail($email, 'İsteğiniz kaydedildi', 
             'En kısa zamanda size dönüş yapılacaktır.');
             
-        return ['success' => true, 'request_id' => $response['id']];
+        return ['success' => true, 'request_id' => $response['data']['id'] ?? null];
         
     } catch (Exception $e) {
         return ['success' => false, 'error' => $e->getMessage()];
@@ -417,22 +424,23 @@ public function handleDataRequest() {
 | `restriction` | Artikel 18 | İşlemeyi kısıtlama |
 | `portability` | Artikel 20 | Taşınabilirlik |
 | `objection` | Artikel 21 | İtiraz hakkı |
-| `automated` | Artikel 22 | Otomatik karar almaya itiraz |
+| `automated_decision` | Artikel 22 | Otomatik karar almaya itiraz (eski ad `automated` da kabul edilir) |
 
-**Dönüş:**
+**Dönüş (201):**
 
 ```php
 [
-    'success' => true,
-    'request_id' => '550e8400-e29b-41d4-a716-446655440000',
-    'status' => 'submitted',
-    'estimated_completion' => '2026-04-30'
+    'status'  => true,
+    'message' => 'Talebiniz alındı. 30 gün içinde yanıt verilecektir.',
+    'data'    => ['id' => 123, 'request_type' => 'Silme', 'due_at' => '2026-12-15T…', 'kvk_appeal_info' => [...]],
 ]
 ```
 
 ### withdrawConsent — Rızayı Geri Çekme (KVKK Md.11/1-e)
 
-KVKK, rızayı geri çekmenin rıza vermek kadar kolay olmasını zorunlu kılar. Consent kaydı temizlenir, audit trail korunur:
+KVKK, rızayı geri çekmenin rıza vermek kadar kolay olmasını zorunlu kılar. Consent kaydı temizlenir, audit trail korunur.
+`POST /api/preferences/{token}/withdraw` ucunu kullanır (sunucudan çalışır); `session_id` zorunludur.
+Ziyaretçinin rıza geçmişi için `getConsentHistory($sessionId)`:
 
 ```php
 // Kullanıcı "Tüm izinleri geri çek" butonuna tıkladığında
@@ -502,6 +510,93 @@ Bu script otomatik olarak:
 - SDK ile senkronize olur
 
 ---
+
+## Birinci Taraf Rıza Proxy'si ve On-Prem (Kasım 2026)
+
+### Neden
+
+Safari, script ile yazılan depolamayı 7 gün etkileşimsizlikte siler; ziyaretçi
+banner'ı haftada bir yeniden görür. Konsolda **Birinci Taraf Toplama** kartından
+proxy'yi kurup doğruladığınızda bundle rıza kararını sitenizin kendi alan
+adındaki `/_vb/{token}/c` adresine gönderir; Veribenim'in yazdığı
+`vb_consent_*` çerezi sitenizin kendi HTTP çerezi olur.
+
+### Çerçevesiz PHP
+
+```php
+use Veribenim\Proxy\ConsentProxy;
+use Veribenim\Proxy\ConsentProxyRequest;
+
+// public/index.php'nin en başında (çıktıdan önce)
+$proxy = new ConsentProxy(
+    token: getenv('VERIBENIM_TOKEN'),
+    proxyKey: getenv('VERIBENIM_PROXY_KEY'),   // yalnızca sunucu ortamında
+);
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($proxy->handles($path)) {
+    // CDN / yük dengeleyici arkasındaysanız onun adreslerini verin;
+    // aksi hâlde yalnızca REMOTE_ADDR kullanılır.
+    $proxy->handle(ConsentProxyRequest::fromGlobals(trustedProxies: ['10.0.0.0/8']))->send();
+    exit;
+}
+```
+
+### Laravel
+
+```dotenv
+VERIBENIM_PROXY_ENABLED=true
+VERIBENIM_PROXY_KEY=vbpk_...
+```
+
+Paket `POST /_vb/{token}/c` ve `GET /_vb/{token}/ping` rotalarını `web`
+grubunun dışında kaydeder (oturum çerezi, CSRF ve çerez şifreleme yok).
+Ziyaretçi IP'si `$request->ip()`'dir: CDN arkasındaysanız Laravel'in
+TrustProxies ayarını yapın.
+
+### WordPress
+
+Ayarlar → Veribenim → "Birinci taraf rıza proxy'si" kutusunu işaretleyip
+anahtarı girin ya da `wp-config.php`'ye `define('VERIBENIM_PROXY_KEY', 'vbpk_...');`
+ekleyin (kayıtlı anahtar sayfaya geri yazılmaz). İstek `init`'te erken
+yakalanır. CDN arkasında ziyaretçi IP'sini güvenilir kaynaktan verin:
+
+```php
+add_filter('veribenim_proxy_client_ip', fn ($ip) => $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $ip); // yalnızca Cloudflare arkasındaysanız
+```
+
+### Güvenlik kuralları (üç adaptörde de aynı)
+
+- Yalnızca `POST /_vb/{token}/c` ve `GET /_vb/{token}/ping` iletilir; token
+  sizinkiyle birebir olmalı, başka her yol 404 (açık proxy değil).
+- Cookie başlığı yalnızca sitenin `vb_consent_*` çerezine indirilir; oturum
+  çerezleri, `Authorization`, `X-Forwarded-For`, `X-Real-IP` iletilmez.
+- `X-VB-Proxy-Key` yalnızca Veribenim'e giden istekte bulunur; yanıtta görünmez.
+- Yanıttan yalnızca `Content-Type`, `Cache-Control` ve rıza çerezinin
+  `Set-Cookie`'si taşınır; yönlendirme izlenmez; gövde en fazla 64 KB.
+
+### On-Prem: adresler tek yerden
+
+```php
+$config = new VeribenimConfig(
+    token: 'ENV_TOKEN',
+    domain: 'example.com',
+    apiUrl: 'https://veribenim-api.kurum.local',
+    bundleBaseUrl: 'https://veribenim-cdn.kurum.local',
+    webUrl: 'https://veribenim.kurum.local',
+);
+```
+
+Varsayılanlar `VeribenimConfig::DEFAULT_API_URL`, `DEFAULT_BUNDLE_BASE_URL`,
+`DEFAULT_WEB_URL` sabitlerindedir (bugünkü adresler). Laravel:
+`VERIBENIM_API_URL`, `VERIBENIM_BUNDLE_BASE_URL`, `VERIBENIM_WEB_URL`.
+WordPress: `veribenim_api_url` / `veribenim_bundle_base_url` seçenekleri ya da
+aynı adlı filtreler.
+
+### WordPress `[veribenim_form mode="js"]` düzeltmesi
+
+Gömme kodu artık `VeribenimReady`'i `window` üzerinde dinliyor ve
+`veribenim.ready` bayrağına bakıyor; eskiden `document` dinlendiği için olay
+hiç ulaşmıyor ve form çizilmiyordu.
 
 ## Güvenlik Standartları
 

@@ -30,6 +30,29 @@ class VeribenimConfigTest extends TestCase
         $this->assertFalse($config->debug);
         $this->assertSame('https://live.veribenim.com', $config->apiUrl);
         $this->assertSame('', $config->scriptUrl);
+        $this->assertSame('https://bundles.veribenim.com', $config->bundleBaseUrl);
+        $this->assertSame('https://veribenim.com', $config->webUrl);
+    }
+
+    public function test_default_constants_are_todays_hosts(): void
+    {
+        $this->assertSame('https://live.veribenim.com', VeribenimConfig::DEFAULT_API_URL);
+        $this->assertSame('https://bundles.veribenim.com', VeribenimConfig::DEFAULT_BUNDLE_BASE_URL);
+        $this->assertSame('https://veribenim.com', VeribenimConfig::DEFAULT_WEB_URL);
+    }
+
+    public function test_bundle_url_uses_custom_bundle_base_for_on_prem(): void
+    {
+        $config = new VeribenimConfig(token: 'tok', domain: 'www.claude.com', bundleBaseUrl: 'https://cdn.kurum.local/bundles/');
+
+        $this->assertSame('https://cdn.kurum.local/bundles/claudecom.js', $config->getBundleUrl());
+    }
+
+    public function test_bundle_url_default_unchanged(): void
+    {
+        $config = new VeribenimConfig(token: 'tok', domain: 'claude.com');
+
+        $this->assertSame('https://bundles.veribenim.com/claudecom.js', $config->getBundleUrl());
     }
 
     public function test_custom_values(): void

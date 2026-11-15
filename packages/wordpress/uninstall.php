@@ -16,6 +16,9 @@ $veribenim_options = [
     'veribenim_lang',
     'veribenim_api_url',
     'veribenim_script_url',
+    'veribenim_bundle_base_url',
+    'veribenim_proxy_enabled',
+    'veribenim_proxy_key',
 ];
 
 foreach ($veribenim_options as $veribenim_option) {

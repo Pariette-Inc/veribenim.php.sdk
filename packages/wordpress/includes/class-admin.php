@@ -34,13 +34,31 @@ class Veribenim_Admin
         register_setting('veribenim_settings', 'veribenim_api_url', [
             'type'              => 'string',
             'sanitize_callback' => 'esc_url_raw',
-            'default'           => 'https://live.veribenim.com',
+            'default'           => Veribenim_Frontend::DEFAULT_API_URL,
         ]);
 
         register_setting('veribenim_settings', 'veribenim_script_url', [
             'type'              => 'string',
             'sanitize_callback' => 'esc_url_raw',
-            'default'           => 'https://bundles.veribenim.com/bundle.js',
+            'default'           => Veribenim_Frontend::LEGACY_PLACEHOLDER_SCRIPT_URL,
+        ]);
+
+        register_setting('veribenim_settings', 'veribenim_bundle_base_url', [
+            'type'              => 'string',
+            'sanitize_callback' => 'esc_url_raw',
+            'default'           => Veribenim_Frontend::DEFAULT_BUNDLE_BASE_URL,
+        ]);
+
+        register_setting('veribenim_settings', 'veribenim_proxy_enabled', [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => false,
+        ]);
+
+        register_setting('veribenim_settings', 'veribenim_proxy_key', [
+            'type'              => 'string',
+            'sanitize_callback' => [$this, 'sanitize_proxy_key'],
+            'default'           => '',
         ]);
 
         // --- Section ---
@@ -66,6 +84,62 @@ class Veribenim_Admin
             page:     'veribenim',
             section:  'veribenim_main',
         );
+
+        add_settings_field(
+            id:       'veribenim_proxy',
+            title:    __('Birinci taraf rıza proxy\'si', 'veribenim'),
+            callback: [$this, 'render_proxy_fields'],
+            page:     'veribenim',
+            section:  'veribenim_main',
+        );
+    }
+
+    /**
+     * Proxy anahtarı alanı. Kayıtlı anahtar sayfaya ASLA yazılmaz (HTML
+     * kaynağında da görünmez); yalnızca kayıtlı olup olmadığı söylenir.
+     * wp-config.php'de VERIBENIM_PROXY_KEY tanımlıysa o kullanılır.
+     */
+    public function render_proxy_fields(): void
+    {
+        $enabled = (bool) get_option('veribenim_proxy_enabled', false);
+        printf(
+            '<label><input type="checkbox" name="veribenim_proxy_enabled" value="1"%s /> %s</label>',
+            $enabled ? ' checked' : '',
+            esc_html__('/_vb/ yolunu Veribenim\'e ilet (Safari\'de rıza kaydı kalıcı olur)', 'veribenim')
+        );
+
+        if (defined('VERIBENIM_PROXY_KEY')) {
+            echo '<p class="description">' . esc_html__('Anahtar wp-config.php içindeki VERIBENIM_PROXY_KEY sabitinden okunuyor.', 'veribenim') . '</p>';
+            return;
+        }
+
+        $stored = (string) get_option('veribenim_proxy_key', '') !== '';
+        printf(
+            '<p><input type="password" name="veribenim_proxy_key" value="" class="regular-text" autocomplete="new-password" placeholder="%s" /></p>',
+            esc_attr($stored ? __('Kayıtlı — değiştirmek için yeni anahtarı girin', 'veribenim') : __('Proxy anahtarı (vbpk_…)', 'veribenim'))
+        );
+        echo '<p class="description">' . esc_html__('Veribenim konsolu → Entegrasyon → Birinci Taraf Toplama kartındaki anahtar. Boş bırakılırsa kayıtlı anahtar korunur.', 'veribenim') . '</p>';
+    }
+
+    /**
+     * Boş gönderim kayıtlı anahtarı korur (alan hiçbir zaman dolu gelmez).
+     */
+    public function sanitize_proxy_key($value): string
+    {
+        $value = trim(sanitize_text_field((string) $value));
+        if ($value === '') {
+            return (string) get_option('veribenim_proxy_key', '');
+        }
+        if (! preg_match('/^[A-Za-z0-9_\-]{16,128}$/', $value)) {
+            add_settings_error(
+                'veribenim_proxy_key',
+                'invalid_format',
+                __('Geçersiz proxy anahtarı biçimi.', 'veribenim'),
+                'error'
+            );
+            return (string) get_option('veribenim_proxy_key', '');
+        }
+        return $value;
     }
 
     public function render_token_field(): void
@@ -119,7 +193,7 @@ class Veribenim_Admin
         }
 
         $token  = get_option('veribenim_token', '');
-        $apiUrl = rtrim((string) get_option('veribenim_api_url', 'https://live.veribenim.com'), '/');
+        $apiUrl = Veribenim_Frontend::api_url();
 
         if (empty($token)) {
             wp_send_json_error(['message' => __('Token girilmemiş.', 'veribenim')]);

@@ -42,16 +42,24 @@ class VeribenimClient
      * @param array|null $preferences Kategori bazlı rıza. Platform anahtarları:
      *                   ['strictly_necessary'=>true, 'functional'=>bool, 'analytics'=>bool, 'marketing'=>bool]
      *                   Platforma `consents` alanı olarak gönderilir.
+     * @param string|null $sessionId Ziyaretçi oturum kimliği. API bu alanı ZORUNLU
+     *                   tutar (`session_id: required`); verilmezse istek atılmaz, false döner.
+     *
+     * Not: Bu uç (`/api/consents/{token}/log`) API'de `origin.check` arkasındadır;
+     * Origin/Referer başlığı olmayan sunucu-sunucu çağrısını 403 ile reddeder.
+     * Tarayıcıda karar kaydını bundle zaten yapar.
      */
     public function logConsent(string $action, ?array $preferences = null, ?string $sessionId = null): bool
     {
-        $data = ['action' => $action];
+        if ($sessionId === null || $sessionId === '') {
+            $this->debugLog('logConsent: session_id zorunlu (API 422 döner) — istek atılmadı');
+            return false;
+        }
+
+        $data = ['action' => $action, 'session_id' => $sessionId];
 
         if ($preferences !== null) {
             $data['consents'] = $preferences;
-        }
-        if ($sessionId !== null) {
-            $data['session_id'] = $sessionId;
         }
 
         return $this->post("/api/consents/{$this->config->token}/log", $data) !== null;
@@ -59,11 +67,36 @@ class VeribenimClient
 
     /**
      * Ziyaretçinin rızasını geri çeker (KVKK Md. 11/1-e, GDPR Md. 7/3).
-     * logConsent('withdraw', ...) için kısayol.
+     * POST /api/preferences/{token}/withdraw — tercih merkezi ucu; origin.check
+     * arkasında olmadığı için sunucudan da çalışır. session_id zorunlu.
      */
     public function withdrawConsent(?string $sessionId = null): bool
     {
-        return $this->logConsent('withdraw', null, $sessionId);
+        if ($sessionId === null || $sessionId === '') {
+            $this->debugLog('withdrawConsent: session_id zorunlu — istek atılmadı');
+            return false;
+        }
+
+        $response = $this->post(
+            "/api/preferences/{$this->config->token}/withdraw",
+            ['session_id' => $sessionId]
+        );
+
+        return is_array($response) && !empty($response['status']);
+    }
+
+    /**
+     * Ziyaretçinin kendi rıza geçmişi (KVKK Md. 11 / GDPR Md. 15).
+     * GET /api/preferences/{token}/history?session_id=...
+     *
+     * @return array|null ['status'=>true,'data'=>[...]] veya null
+     */
+    public function getConsentHistory(string $sessionId): ?array
+    {
+        if ($sessionId === '') {
+            return null;
+        }
+        return $this->get("/api/preferences/{$this->config->token}/history?session_id=" . urlencode($sessionId));
     }
 
     // -------------------------------------------------------------------------
@@ -81,14 +114,18 @@ class VeribenimClient
      * @param array $preferences Kategori bazlı rıza (platform anahtarları:
      *              strictly_necessary, functional, analytics, marketing).
      *              Platforma `consents` alanı olarak gönderilir.
+     * @param string|null $sessionId API'de zorunlu; verilmezse istek atılmaz, null döner.
      */
     public function savePreferences(array $preferences, ?string $sessionId = null): ?array
     {
-        $data = ['consents' => $preferences];
-        if ($sessionId !== null) {
-            $data['session_id'] = $sessionId;
+        if ($sessionId === null || $sessionId === '') {
+            $this->debugLog('savePreferences: session_id zorunlu (API 422 döner) — istek atılmadı');
+            return null;
         }
-        return $this->post("/api/preferences/{$this->config->token}", $data);
+        return $this->post("/api/preferences/{$this->config->token}", [
+            'consents'   => $preferences,
+            'session_id' => $sessionId,
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -247,6 +284,24 @@ class VeribenimClient
             return '<div class="vb-heading">' . $label . '</div>';
         }
 
+        // Rıza kutusu (ve seçeneksiz tekil onay kutusu) — bundle'daki renderForm
+        // ve WordPress eklentisiyle aynı kural. Kutu asla önceden işaretli gelmez.
+        if ($type === 'consent' || ($type === 'checkbox' && empty($field['options']))) {
+            $settings = is_array($field['settings'] ?? null) ? $field['settings'] : [];
+            $text = (string) ($settings['consent_text'] ?? '');
+            if ($text === '') {
+                $text = (string) ($field['label'] ?? '');
+            }
+            $text = str_replace('{policy_title}', (string) ($settings['policy_title'] ?? ''), $text);
+
+            return '<div class="vb-field vb-consent" data-field-uuid="' . $uuid . '">'
+                . '<label class="vb-checkbox-item" for="vb-' . $uuid . '">'
+                . '<input type="checkbox" id="vb-' . $uuid . '" name="' . $uuid . '" value="1"' . $reqAttr . '> '
+                . '<span>' . htmlspecialchars($text) . $reqMark . '</span></label>'
+                . '<div class="vb-error" data-error-for="' . $uuid . '" hidden></div>'
+                . '</div>';
+        }
+
         $html = '<div class="vb-field" data-field-uuid="' . $uuid . '">';
         $html .= '<label class="vb-label" for="vb-' . $uuid . '">' . $label . $reqMark . '</label>';
 
@@ -286,7 +341,8 @@ class VeribenimClient
             case 'file':
                 $accept = implode(',', $field['validation']['file_types'] ?? []);
                 $multi  = !empty($field['settings']['multiple']) ? ' multiple' : '';
-                $html  .= '<input type="file" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input"' . ($accept ? ' accept="' . $accept . '"' : '') . $multi . $reqAttr . '>';
+                // Ad "uuid[]": API dosya alanını dizi olarak doğrular (tek dosyada da).
+                $html  .= '<input type="file" id="vb-' . $uuid . '" name="' . $uuid . '[]" class="vb-input"' . ($accept ? ' accept="' . htmlspecialchars($accept) . '"' : '') . $multi . $reqAttr . '>';
                 break;
 
             case 'date':
@@ -330,30 +386,51 @@ class VeribenimClient
      * Ziyaretçinin veri hakkı başvurusunu oluşturur.
      * 30 günlük yasal süre otomatik hesaplanır.
      *
-     * @param string $requestType  access|rectification|erasure|restriction|portability|objection|automated
-     * @param string $fullName     Başvuranın adı soyadı
+     * API gövdesi: first_name, last_name, email, phone?, request_type, message?
+     * (`DsarController::store`). Geriye uyumluluk için imza korunur: ad soyad
+     * tek alan olarak alınır, SON kelime soyad sayılır.
+     *
+     * @param string $requestType  access|rectification|erasure|restriction|portability|objection|automated_decision
+     *                             ('automated' eski addır, 'automated_decision'a çevrilir)
+     * @param string $fullName     Başvuranın adı soyadı (en az iki kelime)
      * @param string $email        İletişim e-posta adresi
-     * @param string $description  Başvuru açıklaması (opsiyonel)
+     * @param string $description  Başvuru açıklaması (opsiyonel, API'de `message`)
+     * @param string $phone        Telefon (opsiyonel)
+     * @return array|null          ['status'=>true,'message'=>...,'data'=>['id','request_type','due_at',...]]
      */
     public function submitDsar(
         string $requestType,
         string $fullName,
         string $email,
-        string $description = ''
+        string $description = '',
+        string $phone = ''
     ): ?array {
-        $validTypes = ['access', 'rectification', 'erasure', 'restriction', 'portability', 'objection', 'automated'];
+        $validTypes = ['access', 'rectification', 'erasure', 'restriction', 'portability', 'objection', 'automated_decision', 'automated'];
         if (!in_array($requestType, $validTypes, true)) {
             throw new \InvalidArgumentException("[Veribenim] Geçersiz DSAR tipi: {$requestType}");
         }
+        if ($requestType === 'automated') {
+            $requestType = 'automated_decision';
+        }
+
+        $parts = preg_split('/\s+/u', trim($fullName), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($parts) < 2) {
+            throw new \InvalidArgumentException('[Veribenim] submitDsar: ad ve soyad gerekli (API first_name + last_name ister)');
+        }
+        $lastName = (string) array_pop($parts);
 
         $data = [
-            'request_type' => $requestType,
-            'full_name'    => $fullName,
+            'first_name'   => implode(' ', $parts),
+            'last_name'    => $lastName,
             'email'        => $email,
+            'request_type' => $requestType,
         ];
 
-        if (!empty($description)) {
-            $data['description'] = $description;
+        if ($phone !== '') {
+            $data['phone'] = $phone;
+        }
+        if ($description !== '') {
+            $data['message'] = $description;
         }
 
         return $this->post("/api/dsar/{$this->config->token}", $data);
@@ -498,6 +575,13 @@ class VeribenimClient
     // -------------------------------------------------------------------------
     // HTTP helpers (curl — ext-curl opsiyonel, fallback: file_get_contents)
     // -------------------------------------------------------------------------
+
+    private function debugLog(string $message): void
+    {
+        if ($this->config->debug) {
+            error_log('[Veribenim] ' . $message);
+        }
+    }
 
     protected function get(string $path): ?array
     {

@@ -7,6 +7,41 @@ if (! defined('ABSPATH')) exit;
 class Veribenim_Frontend
 {
     /**
+     * Varsayılan adresler — bugünkü bulut kurulumu. Kurum içi (On-Prem)
+     * kurulumda `veribenim_api_url` / `veribenim_bundle_base_url` seçenekleri
+     * ya da aynı adlı filtrelerle değiştirilir.
+     */
+    public const DEFAULT_API_URL = 'https://live.veribenim.com';
+    public const DEFAULT_BUNDLE_BASE_URL = 'https://bundles.veribenim.com';
+    /** Eski sürümlerin script_url seçeneğine yazdığı yer tutucu. */
+    public const LEGACY_PLACEHOLDER_SCRIPT_URL = 'https://bundles.veribenim.com/bundle.js';
+
+    /**
+     * API tabanı: seçenek → `veribenim_api_url` filtresi. Sondaki "/" atılır.
+     */
+    public static function api_url(): string
+    {
+        $url = (string) get_option('veribenim_api_url', self::DEFAULT_API_URL);
+        $url = (string) apply_filters('veribenim_api_url', $url !== '' ? $url : self::DEFAULT_API_URL);
+
+        return rtrim($url !== '' ? $url : self::DEFAULT_API_URL, '/');
+    }
+
+    /**
+     * Bundle dosyalarının tabanı: seçenek → `veribenim_bundle_base_url` filtresi.
+     *
+     * Örnek (wp-config.php ya da mu-plugin):
+     *   add_filter('veribenim_bundle_base_url', fn () => 'https://cdn.kurum.local/bundles');
+     */
+    public static function bundle_base_url(): string
+    {
+        $url = (string) get_option('veribenim_bundle_base_url', self::DEFAULT_BUNDLE_BASE_URL);
+        $url = (string) apply_filters('veribenim_bundle_base_url', $url !== '' ? $url : self::DEFAULT_BUNDLE_BASE_URL);
+
+        return rtrim($url !== '' ? $url : self::DEFAULT_BUNDLE_BASE_URL, '/');
+    }
+
+    /**
      * Banner scriptini WordPress script kuyruğuna ekler (<head>).
      * wp_enqueue_scripts hook'una bağlıdır.
      */
@@ -54,7 +89,7 @@ class Veribenim_Frontend
     {
         // Manuel override varsa kullan
         $custom_url = get_option('veribenim_script_url', '');
-        if (!empty($custom_url) && $custom_url !== 'https://bundles.veribenim.com/bundle.js') {
+        if (!empty($custom_url) && $custom_url !== self::LEGACY_PLACEHOLDER_SCRIPT_URL) {
             return $custom_url;
         }
 
@@ -65,7 +100,7 @@ class Veribenim_Frontend
         }
 
         $filename = self::clean_domain_for_filename($domain);
-        return "https://bundles.veribenim.com/{$filename}.js";
+        return self::bundle_base_url() . "/{$filename}.js";
     }
 
     /**

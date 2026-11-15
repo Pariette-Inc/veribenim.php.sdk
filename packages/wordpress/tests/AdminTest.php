@@ -18,6 +18,34 @@ class AdminTest extends TestCase
         $this->admin = new Veribenim_Admin();
     }
 
+    public function test_sanitize_proxy_key_keeps_stored_key_on_empty_submit(): void
+    {
+        VeribenimWpTestState::$options['veribenim_proxy_key'] = 'vbpk_storedKey1234567890abcd';
+
+        $this->assertSame('vbpk_storedKey1234567890abcd', $this->admin->sanitize_proxy_key(''));
+        $this->assertSame('vbpk_newKey1234567890abcdefgh', $this->admin->sanitize_proxy_key(' vbpk_newKey1234567890abcdefgh '));
+    }
+
+    public function test_sanitize_proxy_key_rejects_bad_format(): void
+    {
+        VeribenimWpTestState::$options['veribenim_proxy_key'] = 'vbpk_storedKey1234567890abcd';
+
+        $this->assertSame('vbpk_storedKey1234567890abcd', $this->admin->sanitize_proxy_key('kısa<script>'));
+        $this->assertCount(1, VeribenimWpTestState::$settingsErrors);
+    }
+
+    public function test_proxy_key_field_never_prints_stored_key(): void
+    {
+        VeribenimWpTestState::$options['veribenim_proxy_key'] = 'vbpk_SECRETstoredKey1234567890';
+
+        ob_start();
+        $this->admin->render_proxy_fields();
+        $html = (string) ob_get_clean();
+
+        $this->assertStringNotContainsString('vbpk_SECRETstoredKey1234567890', $html);
+        $this->assertStringContainsString('name="veribenim_proxy_key" value=""', $html);
+    }
+
     public function test_sanitize_token_accepts_valid_token(): void
     {
         $token = 'abcDEF1234567890_-abcDEF12345678';
