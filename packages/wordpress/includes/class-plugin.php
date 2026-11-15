@@ -174,6 +174,13 @@ class Veribenim_Plugin
         if ($type === 'divider') return '<hr class="vb-divider">' . PHP_EOL;
         if ($type === 'heading') return '<div class="vb-heading">' . $label . '</div>' . PHP_EOL;
 
+        // Rıza kutusu (ve seçeneksiz tekil onay kutusu). Bundle'daki renderForm ile
+        // aynı kural. Eskiden bu tip tanınmıyor, düz metin kutusu olarak çiziliyordu:
+        // ziyaretçi onay kutusu yerine boş bir yazı alanı görüyordu.
+        if ($type === 'consent' || ($type === 'checkbox' && empty($field['options']))) {
+            return $this->build_consent_html($field, $type, $uuid, $required);
+        }
+
         $html  = '<div class="vb-field" data-field-uuid="' . $uuid . '">' . PHP_EOL;
         $html .= '<label class="vb-label" for="vb-' . $uuid . '">' . $label . $reqMark . '</label>' . PHP_EOL;
 
@@ -211,7 +218,8 @@ class Veribenim_Plugin
             case 'file':
                 $accept = implode(',', $field['validation']['file_types'] ?? []);
                 $multi  = !empty($field['settings']['multiple']) ? ' multiple' : '';
-                $html  .= '<input type="file" id="vb-' . $uuid . '" name="' . $uuid . '" class="vb-input"' . ($accept ? ' accept="' . esc_attr($accept) . '"' : '') . $multi . $reqAttr . '>';
+                // Ad "uuid[]": API dosya alanını dizi olarak doğrular (tek dosyada da).
+                $html  .= '<input type="file" id="vb-' . $uuid . '" name="' . $uuid . '[]" class="vb-input"' . ($accept ? ' accept="' . esc_attr($accept) . '"' : '') . $multi . $reqAttr . '>';
                 break;
 
             case 'date':
@@ -238,6 +246,44 @@ class Veribenim_Plugin
 
         if ($helpText) {
             $html .= PHP_EOL . '<div class="vb-help">' . $helpText . '</div>';
+        }
+
+        $html .= PHP_EOL . '<div class="vb-error" data-error-for="' . $uuid . '" hidden aria-live="polite"></div>';
+        $html .= PHP_EOL . '</div>' . PHP_EOL;
+
+        return $html;
+    }
+
+    /**
+     * Rıza kutusunu üretir. Kutu hiçbir zaman önceden işaretli gelmez (KVKK:
+     * açık rıza ziyaretçinin kendi eylemiyle verilir). Bağlı aydınlatma metni
+     * varsa kutunun altında açılır bölüm olarak, düz metin hâlinde gösterilir.
+     */
+    private function build_consent_html(array $field, string $type, string $uuid, bool $required): string
+    {
+        $settings = is_array($field['settings'] ?? null) ? $field['settings'] : [];
+        $policyTitle = (string) ($settings['policy_title'] ?? '');
+        $text = (string) ($settings['consent_text'] ?? '');
+        if ($text === '') {
+            $text = (string) ($field['label'] ?? '');
+        }
+        $text = str_replace('{policy_title}', $policyTitle, $text);
+
+        $reqAttr = $required ? ' required aria-required="true"' : '';
+        $reqMark = $required ? '<span class="vb-required" aria-hidden="true">*</span>' : '';
+
+        $html  = '<div class="vb-field vb-consent" data-field-uuid="' . $uuid . '">' . PHP_EOL;
+        $html .= '<label class="vb-checkbox-item" for="vb-' . $uuid . '">';
+        $html .= '<input type="checkbox" id="vb-' . $uuid . '" name="' . $uuid . '" value="1"' . $reqAttr . '> ';
+        $html .= '<span>' . esc_html($text) . $reqMark . '</span></label>';
+
+        $policyContent = (string) ($settings['policy_content'] ?? '');
+        if ($type === 'consent' && $policyContent !== '') {
+            // Etiketler atılır: metin başka bir sitenin panelinden gelir, HTML olarak basılmaz.
+            $plain = trim(strip_tags(preg_replace('/<(br|\/p|\/div|\/li|\/h[1-6])[^>]*>/i', "\n", $policyContent) ?? ''));
+            $summary = $policyTitle !== '' ? $policyTitle : (string) ($field['label'] ?? '');
+            $html .= PHP_EOL . '<details class="vb-policy"><summary>' . esc_html($summary) . '</summary>';
+            $html .= '<div style="white-space:pre-wrap">' . esc_html($plain) . '</div></details>';
         }
 
         $html .= PHP_EOL . '<div class="vb-error" data-error-for="' . $uuid . '" hidden aria-live="polite"></div>';
@@ -287,16 +333,37 @@ class Veribenim_Plugin
             '    e.preventDefault();',
             "    var btn = form.querySelector('[type=submit]');",
             '    if(btn) btn.disabled = true;',
+            "    form.querySelectorAll('[data-error-for]').forEach(function(el){ el.hidden = true; el.textContent = ''; });",
             '    var fd = new FormData(form);',
-            '    var data = {};',
-            "    fd.forEach(function(v,k){ if(k.endsWith('[]')){var rk=k.slice(0,-2);data[rk]=data[rk]||[];data[rk].push(v);}else{data[k]=v;}});",
-            "    fetch('" . $formAction . "', {",
-            "      method: 'POST',",
-            "      headers: {'Content-Type':'application/json','Accept':'application/json'},",
-            '      body: JSON.stringify(data)',
-            '    })',
-            '    .then(function(r){ return r.json(); })',
-            '    .then(function(res){',
+            // Dosya alanı varsa JSON taşıyamaz: çok parçalı gönderilir, tarayıcı başlığı kendi yazar.
+            "    var hasFile = !!form.querySelector('input[type=file]');",
+            "    var opts = {method: 'POST', headers: {'Accept':'application/json'}};",
+            '    if(hasFile){',
+            "      form.querySelectorAll('input[type=file]').forEach(function(f){ if(!f.files.length) fd.delete(f.name); });",
+            '      opts.body = fd;',
+            '    } else {',
+            '      var data = {};',
+            "      fd.forEach(function(v,k){ if(k.endsWith('[]')){var rk=k.slice(0,-2);data[rk]=data[rk]||[];data[rk].push(v);}else{data[k]=v;}});",
+            "      opts.headers['Content-Type'] = 'application/json';",
+            '      opts.body = JSON.stringify(data);',
+            '    }',
+            "    fetch('" . $formAction . "', opts)",
+            // Sunucu reddettiyse (ör. 422 zorunlu alan) başarı ekranı GÖSTERİLMEZ.
+            '    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(body){ return {ok: r.ok, body: body || {}}; }); })',
+            '    .then(function(out){',
+            '      var res = out.body;',
+            '      if(!out.ok){',
+            '        if(btn) btn.disabled = false;',
+            '        var shown = false;',
+            '        var errs = res.errors || {};',
+            '        Object.keys(errs).forEach(function(k){',
+            "          var key = k.split('.')[0];",
+            "          var box = form.querySelector('[data-error-for=\"' + key + '\"]');",
+            '          if(box){ box.textContent = [].concat(errs[k])[0]; box.hidden = false; shown = true; }',
+            '        });',
+            "        if(!shown) alert(res.message || 'Form gönderilemedi. Lütfen tekrar deneyin.');",
+            '        return;',
+            '      }',
             "      var t = res.success_title || '" . $successTitle . "';",
             "      var m = res.success_message || '" . $successMessage . "';",
             "      form.innerHTML = '" . $successHtml . "';",

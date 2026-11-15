@@ -245,4 +245,84 @@ class PluginTest extends TestCase
         $this->assertStringNotContainsString('javascript:alert', $output);
         $this->assertStringNotContainsString('window.location.href', $output);
     }
+
+    // -------------------------------------------------------------------------
+    // Rıza kutusu, dosya alanı ve gönderim hatası
+    // -------------------------------------------------------------------------
+
+    public function test_consent_field_renders_unchecked_checkbox_not_text_input(): void
+    {
+        $this->withToken();
+        $this->withSchema([
+            'slug'   => 'iletisim',
+            'fields' => [[
+                'uuid' => 'u-kvkk', 'type' => 'consent', 'label' => 'Aydınlatma', 'required' => true,
+                'settings' => [
+                    'consent_text'   => '{policy_title} metnini okudum ve anladım',
+                    'policy_title'   => 'Aydınlatma Metni',
+                    'policy_content' => '<p>Verileriniz <b>işlenir</b>.</p><script>alert(1)</script>',
+                ],
+            ]],
+        ]);
+
+        $output = $this->plugin->render_form_shortcode(['slug' => 'iletisim']);
+
+        $this->assertStringContainsString('<input type="checkbox" id="vb-u-kvkk" name="u-kvkk" value="1" required', $output);
+        $this->assertStringNotContainsString('type="text" id="vb-u-kvkk"', $output);
+        $this->assertStringNotContainsString('checked', $output, 'Rıza kutusu önceden işaretli gelmemeli');
+        $this->assertStringContainsString('Aydınlatma Metni metnini okudum ve anladım', $output);
+        $this->assertStringContainsString('<details class="vb-policy">', $output);
+        $this->assertStringContainsString('Verileriniz işlenir.', $output);
+        $this->assertStringNotContainsString('<script>alert(1)</script>', $output);
+        $this->assertStringNotContainsString('<b>', $output);
+    }
+
+    public function test_checkbox_without_options_renders_as_single_box(): void
+    {
+        $this->withToken();
+        $this->withSchema([
+            'slug'   => 'iletisim',
+            'fields' => [['uuid' => 'u-tek', 'type' => 'checkbox', 'label' => 'Bülten istiyorum']],
+        ]);
+
+        $output = $this->plugin->render_form_shortcode(['slug' => 'iletisim']);
+
+        $this->assertStringContainsString('<input type="checkbox" id="vb-u-tek" name="u-tek" value="1">', $output);
+        $this->assertStringNotContainsString('<details', $output);
+    }
+
+    public function test_file_field_is_named_as_array(): void
+    {
+        $this->withToken();
+        $this->withSchema([
+            'slug'   => 'iletisim',
+            'fields' => [['uuid' => 'u-dosya', 'type' => 'file', 'label' => 'Belge']],
+        ]);
+
+        $output = $this->plugin->render_form_shortcode(['slug' => 'iletisim']);
+
+        $this->assertStringContainsString('name="u-dosya[]"', $output);
+    }
+
+    public function test_inline_script_is_valid_javascript_and_checks_response_status(): void
+    {
+        $this->withToken();
+        $this->withSchema(['slug' => 'iletisim', 'fields' => [], 'settings' => ['success_title' => "Te'şekkürler"]]);
+
+        $output = $this->plugin->render_form_shortcode(['slug' => 'iletisim']);
+
+        $this->assertStringContainsString('if(!out.ok){', $output);
+        $this->assertSame(1, preg_match('#<script>(.*)</script>#s', $output, $m));
+
+        $node = trim((string) shell_exec('command -v node 2>/dev/null'));
+        if ($node === '') {
+            $this->markTestSkipped('node bulunamadı; sözdizimi denetimi atlandı');
+        }
+        $file = tempnam(sys_get_temp_dir(), 'vbwp') . '.js';
+        file_put_contents($file, $m[1]);
+        exec(escapeshellarg($node) . ' --check ' . escapeshellarg($file) . ' 2>&1', $lines, $code);
+        @unlink($file);
+
+        $this->assertSame(0, $code, implode("\n", $lines));
+    }
 }
